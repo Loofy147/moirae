@@ -3,8 +3,10 @@ import tseslint from 'typescript-eslint';
 
 // ADR-002: ambient nondeterminism is banned in the engine and in protocols.
 // Time comes from ctx.now(), randomness from ctx.random(), scheduling from
-// ctx.setTimer(). There is no other way to get any of them, and inline
-// eslint-disable comments are dead in these packages (noInlineConfig below).
+// ctx.setTimer(). Inline eslint-disable comments are dead in these packages
+// (noInlineConfig below). Lint is the first line of defence, not a proof:
+// exotic indirection can still slip through, and review is the backstop —
+// ADR-002 records the known limits.
 const BAN =
   'is nondeterministic and banned in core/protocols (ADR-002). ' +
   'Use ctx.now() for time, ctx.random() for randomness, ctx.setTimer() for scheduling.';
@@ -52,20 +54,28 @@ const bannedGlobals = [
   'window',
   'self',
   'global',
+  'Function',
 ];
 
 const bannedNodeImports = [...builtinModules, ...builtinModules.map((m) => `node:${m}`)];
+
+// Methods whose output depends on the host locale, wherever they are called.
+const localeMethods =
+  '^(localeCompare|toLocaleString|toLocaleDateString|toLocaleTimeString|toLocaleLowerCase|toLocaleUpperCase)$';
 
 export default tseslint.config(
   {
     ignores: ['**/node_modules/', '**/dist/', 'coverage/', 'out/'],
   },
   {
-    files: ['**/*.ts', '**/*.mts', '**/*.cts'],
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
     extends: [tseslint.configs.recommended],
   },
   {
-    files: ['packages/core/**/*.ts', 'packages/protocols/**/*.ts'],
+    files: [
+      'packages/core/**/*.{ts,tsx,mts,cts}',
+      'packages/protocols/**/*.{ts,tsx,mts,cts}',
+    ],
     linterOptions: {
       noInlineConfig: true,
       reportUnusedDisableDirectives: 'error',
@@ -78,6 +88,38 @@ export default tseslint.config(
       'no-restricted-properties': [
         'error',
         { object: 'Math', property: 'random', message: `'Math.random' ${BAN}` },
+      ],
+      // eval and Function are escape hatches to every banned global.
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          // Any use of Math except plain `Math.method(...)` — aliasing
+          // (`const m = Math`), computed access (`Math[k]`), or passing Math
+          // around would put Math.random back in reach.
+          selector: "Identifier[name='Math']:not(MemberExpression[computed=false] > .object)",
+          message: `Aliasing or indirect access to 'Math' ${BAN}`,
+        },
+        {
+          selector: "MemberExpression[object.name='Math'][computed=true]",
+          message: `Computed access to 'Math' ${BAN}`,
+        },
+        {
+          selector: `MemberExpression[computed=false][property.name=/${localeMethods}/]`,
+          message: `This locale-dependent method ${BAN}`,
+        },
+        {
+          selector: `MemberExpression[computed=true][property.value=/${localeMethods}/]`,
+          message: `This locale-dependent method ${BAN}`,
+        },
+        {
+          // no-restricted-imports only sees static declarations; a dynamic
+          // import could reach node builtins. The engine's import graph is
+          // static, so dynamic import has no legitimate use here at all.
+          selector: 'ImportExpression',
+          message: `Dynamic import() ${BAN} Use static imports.`,
+        },
       ],
       'no-restricted-imports': [
         'error',

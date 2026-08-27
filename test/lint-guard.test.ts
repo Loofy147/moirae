@@ -52,6 +52,49 @@ describe('the nondeterminism ban (ADR-002)', () => {
     expect(rulesIn(messages)).toContain('no-restricted-globals');
   });
 
+  it('flags Date in .mts and .tsx files too — the ban is not tied to one extension', async () => {
+    const mts = await lint(CORE.replace(/\.ts$/, '.mts'), 'export const t = Date.now();\n');
+    const tsx = await lint(CORE.replace(/\.ts$/, '.tsx'), 'export const t = Date.now();\n');
+    expect(rulesIn(mts)).toContain('no-restricted-globals');
+    expect(rulesIn(tsx)).toContain('no-restricted-globals');
+  });
+
+  it('flags eval and the Function constructor, escape hatches to every banned global', async () => {
+    const evl = await lint(CORE, "export const t = eval('Date.now()') as number;\n");
+    const fn = await lint(
+      CORE,
+      "export const t = new Function('return Date.now()')() as number;\n",
+    );
+    expect(rulesIn(evl)).toContain('no-eval');
+    expect(rulesIn(fn)).toContain('no-restricted-globals');
+  });
+
+  it('flags aliased and computed access to Math, which would put Math.random back in reach', async () => {
+    const aliased = await lint(CORE, 'const m = Math;\nexport const r = m.random();\n');
+    const computed = await lint(
+      CORE,
+      "const k = 'random' as const;\nexport const r = Math[k]();\n",
+    );
+    expect(rulesIn(aliased)).toContain('no-restricted-syntax');
+    expect(rulesIn(computed)).toContain('no-restricted-syntax');
+  });
+
+  it('flags locale-dependent methods, whose output depends on the host environment', async () => {
+    const messages = await lint(
+      CORE,
+      "export const c = 'a'.localeCompare('b');\nexport const s = (1.5).toLocaleString();\n",
+    );
+    expect(rulesIn(messages)).toContain('no-restricted-syntax');
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('flags dynamic import, which no-restricted-imports cannot see', async () => {
+    const builtin = await lint(CORE, "export const p = import('node:fs');\n");
+    const relative = await lint(CORE, "export const p = import('./somewhere.js');\n");
+    expect(rulesIn(builtin)).toContain('no-restricted-syntax');
+    expect(rulesIn(relative)).toContain('no-restricted-syntax');
+  });
+
   it('flags node builtin imports in protocols, bare and prefixed', async () => {
     const bare = await lint(PROTOCOLS, "import * as fs from 'fs';\nexport const x = fs;\n");
     const prefixed = await lint(
@@ -79,10 +122,12 @@ describe('the nondeterminism ban (ADR-002)', () => {
     expect(messages).toEqual([]);
   });
 
-  it('leaves deterministic code alone', async () => {
+  it('leaves deterministic code alone, including plain Math methods', async () => {
     const messages = await lint(
       CORE,
-      'export function add(a: number, b: number): number {\n  return a + b;\n}\n',
+      'export function add(a: number, b: number): number {\n' +
+        '  return Math.floor(a) + Math.max(b, 0) + Math.abs(a - b);\n' +
+        '}\n',
     );
     expect(messages).toEqual([]);
   });
