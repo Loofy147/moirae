@@ -1,0 +1,7 @@
+# All text files are LF in the repo and in the working tree, on every platform.
+# The determinism test hashes traces byte-for-byte; a CRLF rewrite by git would
+# make identical runs hash differently and look like an engine bug.
+* text=auto eol=lf
+
+# Traces and trace fixtures are byte streams, not text. Git must never touch them.
+*.jsonl -text

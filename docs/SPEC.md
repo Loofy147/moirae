@@ -112,6 +112,13 @@ Rules: `state` events carry patches, not full snapshots — the viewer reconstru
 `msgId` is assigned at send and is how send/deliver/drop are correlated. The header line records
 seed, node count, network config and moira version so a trace is self-describing.
 
+A trace is a byte stream, not a text document. Lines end in `\n` (LF) on every platform, and the
+acceptance criterion of byte-identical traces (§10.1) is a hash over those exact bytes. To keep
+git from silently breaking this: the repo's `.gitattributes` forces `eol=lf` for all text files
+and marks `*.jsonl` (traces and trace fixtures) as `-text` so git never rewrites them, and any
+formatter configuration must set line endings to LF. A trace fixture that has been CRLF-converted
+is corrupt even though it looks identical in an editor.
+
 ## 6. Network model
 
 ```ts
