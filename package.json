@@ -4,9 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "tsc -p tsconfig.json && pnpm -r run typecheck",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "devDependencies": {
     "eslint": "^10.9.1",
