@@ -104,13 +104,17 @@ consumer — CLI output, the studio UI, future tooling.
 {"t":183,  "seq":44,"kind":"drop",      "msgId":89,"reason":"partition"}
 {"t":183,  "seq":45,"kind":"state",     "node":3,"patch":{"role":"follower","term":2}}
 {"t":200,  "seq":50,"kind":"timer",     "node":1,"name":"election"}
+{"t":200,  "seq":51,"kind":"log",       "node":1,"event":"election-started","data":{"term":3}}
 {"t":900,  "seq":91,"kind":"fault",     "fault":"partition","groups":[[1,2],[3,4,5]]}
 {"t":1340, "seq":99,"kind":"violation", "invariant":"atMostOneLeaderPerTerm","detail":"..."}
 ```
 
 Rules: `state` events carry patches, not full snapshots — the viewer reconstructs by folding.
-`msgId` is assigned at send and is how send/deliver/drop are correlated. The header line records
-seed, node count, network config and moira version so a trace is self-describing.
+A patch holds the changed top-level state fields; a field deleted from the state appears as
+`null`. `ctx.log(event, data?)` emits `log` events. Node ids are 1-based (`1..nodes`). `msgId`
+is assigned at send and is how send/deliver/drop are correlated. The header line records the
+trace format version, seed, node count, network config and moira version so a trace is
+self-describing.
 
 A trace is a byte stream, not a text document. Lines end in `\n` (LF) on every platform, and the
 acceptance criterion of byte-identical traces (§10.1) is a hash over those exact bytes. To keep
