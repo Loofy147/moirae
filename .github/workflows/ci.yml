@@ -9,6 +9,12 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      # Every matrix job asserts the same pinned golden trace hash, so
+      # "byte-identical traces across Node versions" (SPEC §10.1) is an
+      # enforced fact, not a claim.
+      matrix:
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       # pnpm/setup is the successor to pnpm/action-setup for pnpm 11+.
@@ -16,7 +22,7 @@ jobs:
       # installs node, and caches the pnpm store.
       - uses: pnpm/setup@v2
         with:
-          runtime: node@24
+          runtime: node@${{ matrix.node }}
           cache: true
           install: false
       - run: pnpm install --frozen-lockfile
