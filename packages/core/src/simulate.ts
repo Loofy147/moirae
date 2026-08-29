@@ -40,7 +40,23 @@ interface PartitionEndEv {
   index: number;
 }
 
-type EngineEvent = DeliverEv | TimerEv | PartitionStartEv | PartitionEndEv;
+interface CrashEv {
+  kind: 'crash';
+  node: NodeId;
+}
+
+interface RestartEv {
+  kind: 'restart';
+  node: NodeId;
+}
+
+type EngineEvent = DeliverEv | TimerEv | PartitionStartEv | PartitionEndEv | CrashEv | RestartEv;
+
+export interface CrashSchedule {
+  readonly node: NodeId;
+  readonly at: SimTime;
+  readonly restartAt?: SimTime; // omitted = stays down
+}
 
 export interface SimulateOptions<S extends Record<string, unknown>> {
   seed: number;
@@ -49,6 +65,7 @@ export interface SimulateOptions<S extends Record<string, unknown>> {
   // The loop also terminates when the queue is empty or an invariant fails.
   until: { simTime?: SimTime; steps?: number };
   network?: NetworkConfig; // omitted = immediate, lossless delivery
+  faults?: { readonly crashes?: readonly CrashSchedule[] };
   invariants?: readonly Invariant<S>[];
 }
 
@@ -68,6 +85,7 @@ interface NodeRuntime<S> {
   ctx: Ctx<S>;
   state: S;
   crashed: boolean;
+  persisted: Record<string, unknown>; // the surviving fields, captured at the crash event
 }
 
 export function simulate<S extends Record<string, unknown>>(
@@ -176,6 +194,48 @@ export function simulate<S extends Record<string, unknown>>(
     }
   };
 
+  // A crash snapshots the fields the process declared persistent and loses
+  // the rest (SPEC §3). Timers die with the node; deliveries to it become
+  // drops; its sends are ignored. The trace line lists what survived.
+  const crashNode = (rt: NodeRuntime<S>, cause: 'self' | 'schedule'): void => {
+    if (rt.crashed) return;
+    // A crash inside init() finds no state yet: nothing to persist.
+    const state = (rt.state ?? {}) as Record<string, unknown>;
+    const keep = new Set((rt.proc.persistent ?? []).map(String)); // membership only
+    const persisted: string[] = [];
+    const lost: string[] = [];
+    const kept: Record<string, unknown> = {};
+    for (const key of Object.keys(state)) {
+      if (keep.has(key)) {
+        persisted.push(key);
+        const serialized = JSON.stringify(state[key]);
+        if (serialized !== undefined) kept[key] = JSON.parse(serialized);
+      } else {
+        lost.push(key);
+      }
+    }
+    rt.persisted = deepFreeze(kept); // the snapshot handed to onRestart must not drift
+    rt.crashed = true;
+    rt.timers.clear();
+    emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'crash', node: rt.id, cause, persisted, lost });
+  };
+
+  // Restart = init() for a fresh state, persisted fields overlaid, then the
+  // optional onRestart hook. The first state patch after a restart is a
+  // full snapshot, so the viewer can fold from it.
+  const restartNode = (rt: NodeRuntime<S>): void => {
+    if (!rt.crashed) return;
+    rt.crashed = false;
+    emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'restart', node: rt.id });
+    const before = snapshot(undefined);
+    const fresh = rt.proc.init(rt.ctx);
+    // Overlay a copy: the live state must not alias the frozen snapshot.
+    const revived = JSON.parse(JSON.stringify(rt.persisted)) as Record<string, unknown>;
+    rt.state = { ...fresh, ...revived } as S;
+    rt.proc.onRestart?.(rt.ctx, rt.persisted as Partial<S>);
+    emitStatePatch(rt, before);
+  };
+
   // SPEC §7: a deep-frozen copy of every node's state, the crashed set, the
   // clock and the history. Copying (rather than freezing the live state)
   // keeps the protocol free to mutate its own state afterwards.
@@ -221,6 +281,7 @@ export function simulate<S extends Record<string, unknown>>(
       ctx: undefined as unknown as Ctx<S>,
       state: undefined as unknown as S,
       crashed: false,
+      persisted: {},
     };
     rt.ctx = {
       me: id,
@@ -258,10 +319,7 @@ export function simulate<S extends Record<string, unknown>>(
         );
       },
       crash: () => {
-        if (!rt.crashed) {
-          rt.crashed = true;
-          emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'crash', node: id });
-        }
+        crashNode(rt, 'self');
       },
     };
     runtimes.push(rt);
@@ -272,6 +330,18 @@ export function simulate<S extends Record<string, unknown>>(
   network.partitions.forEach((p, index) => {
     queue.insert(p.start, { kind: 'partition-start', index });
     queue.insert(p.end, { kind: 'partition-end', index });
+  });
+  (opts.faults?.crashes ?? []).forEach((c, i) => {
+    const where = `faults.crashes[${i}]`;
+    if (!Number.isInteger(c.node) || c.node < 1 || c.node > nodeCount) {
+      throw new Error(`${where}: node ${c.node} does not exist`);
+    }
+    if (!(c.at >= 0)) throw new Error(`${where}: at must be >= 0, got ${c.at}`);
+    if (c.restartAt !== undefined && !(c.restartAt > c.at)) {
+      throw new Error(`${where}: restartAt (${c.restartAt}) must be after at (${c.at})`);
+    }
+    queue.insert(c.at, { kind: 'crash', node: c.node });
+    if (c.restartAt !== undefined) queue.insert(c.restartAt, { kind: 'restart', node: c.node });
   });
 
   for (const rt of runtimes) {
@@ -316,6 +386,10 @@ export function simulate<S extends Record<string, unknown>>(
       network.endPartition();
       const groups = (network.partitions[ev.index] as { groups: readonly (readonly NodeId[])[] }).groups;
       emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'heal', groups });
+    } else if (ev.kind === 'crash') {
+      crashNode(byId(ev.node), 'schedule');
+    } else if (ev.kind === 'restart') {
+      restartNode(byId(ev.node));
     } else {
       const rt = byId(ev.node);
       // A stale generation means the timer was replaced or cancelled; a

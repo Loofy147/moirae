@@ -135,7 +135,7 @@ describe('simulate', () => {
       until: {},
     });
     expect(events(run.trace, 'fault')).toEqual([
-      { t: 0, seq: expect.anything() as number, kind: 'fault', fault: 'crash', node: 1 },
+      { t: 0, seq: expect.anything() as number, kind: 'fault', fault: 'crash', node: 1, cause: 'self', persisted: [], lost: [] },
     ]);
     expect(events(run.trace, 'send')).toHaveLength(1); // only node 2's poke
     const drops = events(run.trace, 'drop') as unknown as DropEvent[];
@@ -388,5 +388,100 @@ describe('simulate with partitions', () => {
     expect(drops[0]?.reason).toBe('partition');
     // t=50: 1->2 delivered, 1->3 dropped; t=100: both delivered.
     expect(events(run.trace, 'deliver')).toHaveLength(3);
+  });
+});
+
+describe('simulate with a crash schedule', () => {
+  const restarts: Bag[] = [];
+
+  class Durable implements Process<Bag> {
+    persistent = ['term', 'log'] as const;
+    init(ctx: Ctx<Bag>): Bag {
+      ctx.setTimer('heartbeat', 30);
+      return { term: 0, log: [], role: 'follower' };
+    }
+    onMessage(): void {}
+    onTimer(ctx: Ctx<Bag>): void {
+      ctx.state['term'] = (ctx.state['term'] as number) + 1;
+      (ctx.state['log'] as number[]).push(ctx.now());
+      ctx.state['role'] = 'candidate';
+      ctx.setTimer('heartbeat', 30);
+    }
+    onRestart(_ctx: Ctx<Bag>, persisted: Partial<Bag>): void {
+      restarts.push({ ...persisted });
+    }
+  }
+
+  it('a scheduled crash records what survived and what was lost', () => {
+    const run = simulate({
+      seed: 1,
+      nodes: 1,
+      process: Durable,
+      until: { simTime: 200 },
+      faults: { crashes: [{ node: 1, at: 70 }] },
+    });
+    const faults = events(run.trace, 'fault');
+    expect(faults).toEqual([
+      {
+        t: 70,
+        seq: expect.anything() as number,
+        kind: 'fault',
+        fault: 'crash',
+        node: 1,
+        cause: 'schedule',
+        persisted: ['term', 'log'],
+        lost: ['role'],
+      },
+    ]);
+    // Two heartbeats before the crash (30, 60); the node stays down after.
+    expect(events(run.trace, 'timer').map((e) => e['t'])).toEqual([30, 60]);
+  });
+
+  it('a restart re-inits, overlays the persisted fields and calls onRestart', () => {
+    restarts.length = 0;
+    const run = simulate({
+      seed: 1,
+      nodes: 1,
+      process: Durable,
+      until: { simTime: 200 },
+      faults: { crashes: [{ node: 1, at: 70, restartAt: 100 }] },
+    });
+    const faults = events(run.trace, 'fault');
+    expect(faults.map((f) => [f['fault'], f['t']])).toEqual([
+      ['crash', 70],
+      ['restart', 100],
+    ]);
+    // The first patch after restart is a full snapshot: fresh role, persisted term/log.
+    const patches = events(run.trace, 'state') as unknown as StateEvent[];
+    const afterRestart = patches.find((p) => p.t === 100);
+    expect(afterRestart?.patch).toEqual({ term: 2, log: [30, 60], role: 'follower' });
+    expect(restarts).toEqual([{ term: 2, log: [30, 60] }]);
+    // Pre-crash timers died with the node; init set a new one at restart (fires at 130).
+    expect(events(run.trace, 'timer').map((e) => e['t'])).toEqual([30, 60, 130, 160, 190]);
+  });
+
+  it('crashing an already-crashed node is a no-op, restarting a live node too', () => {
+    const run = simulate({
+      seed: 1,
+      nodes: 1,
+      process: Durable,
+      until: { simTime: 200 },
+      faults: { crashes: [{ node: 1, at: 40, restartAt: 50 }, { node: 1, at: 45 }] },
+    });
+    expect(events(run.trace, 'fault').map((f) => f['fault'])).toEqual(['crash', 'restart']);
+  });
+
+  it('rejects a malformed schedule loudly', () => {
+    const bad = (crashes: unknown) => () =>
+      simulate({
+        seed: 1,
+        nodes: 1,
+        process: Durable,
+        until: { steps: 1 },
+        faults: { crashes: crashes as never },
+      });
+    expect(bad([{ node: 2, at: 1 }])).toThrow(/does not exist/);
+    expect(bad([{ node: 1, at: -1 }])).toThrow(/at must be/);
+    expect(bad([{ node: 1, at: 10, restartAt: 10 }])).toThrow(/restartAt/);
   });
 });

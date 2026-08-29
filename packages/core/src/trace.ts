@@ -74,11 +74,24 @@ export interface LogEvent {
   data?: Record<string, unknown>;
 }
 
+// Self-describing (ADR-003): a reader must be able to tell why a node came
+// back with an empty log without the source that produced the trace.
 export interface CrashFault {
   t: SimTime;
   seq: number;
   kind: 'fault';
   fault: 'crash';
+  node: NodeId;
+  cause: 'self' | 'schedule'; // ctx.crash() vs the fault schedule
+  persisted: string[]; // state fields that survive, in state key order
+  lost: string[]; // state fields that do not
+}
+
+export interface RestartFault {
+  t: SimTime;
+  seq: number;
+  kind: 'fault';
+  fault: 'restart';
   node: NodeId;
 }
 
@@ -98,7 +111,7 @@ export interface HealFault {
   groups: readonly (readonly NodeId[])[]; // the partition that just ended
 }
 
-export type FaultEvent = CrashFault | PartitionFault | HealFault;
+export type FaultEvent = CrashFault | RestartFault | PartitionFault | HealFault;
 
 export interface ViolationEvent {
   t: SimTime;
