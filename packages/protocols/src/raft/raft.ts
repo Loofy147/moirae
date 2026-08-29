@@ -8,7 +8,7 @@
 // ordering in v0; the discipline is enforced by review, not by a test.
 
 import type { Ctx, Message, NodeId, Process } from '@moira/core';
-import type { RaftMessage, RequestVote, RequestVoteResponse } from './messages';
+import type { AppendEntries, RaftMessage, RequestVote, RequestVoteResponse } from './messages';
 import {
   ELECTION_TIMEOUT_MAX,
   ELECTION_TIMEOUT_MIN,
@@ -75,6 +75,9 @@ export class Raft implements Process<RaftState> {
       case 'RequestVoteResponse':
         this.onRequestVoteResponse(ctx, from, m);
         break;
+      case 'AppendEntries':
+        this.onAppendEntries(ctx, from, m);
+        break;
       // Remaining handlers arrive rule by rule; see the commit history.
     }
   }
@@ -124,6 +127,83 @@ export class Raft implements Process<RaftState> {
     if (m.voteGranted && !s.votesGranted.includes(from)) {
       s.votesGranted.push(from);
       if (this.hasMajority(ctx)) this.becomeLeader(ctx);
+    }
+  }
+
+  private onAppendEntries(ctx: Ctx<RaftState>, from: NodeId, m: AppendEntries): void {
+    const s = ctx.state;
+    // §5.2 — "If the leader's term (included in its RPC) is at least as large
+    // as the candidate's current term, then the candidate recognizes the
+    // leader as legitimate and returns to follower state." (Equal here; a
+    // greater term was handled by the term rule.)
+    if (s.role === 'candidate') this.becomeFollower(ctx);
+    // Election Safety (§5.2): there cannot be another leader in our term. An
+    // AppendEntries claiming otherwise is not processed — a leader never
+    // touches its own log on anyone's say-so (RAFT.md #8).
+    if (s.role === 'leader') return;
+    s.leaderId = m.leaderId;
+    // §5.2 / RAFT.md #5 — contact from the current term's leader resets the
+    // election timer. This happens before the consistency check, as in the
+    // authors' LogCabin: a lagging follower must not start elections while a
+    // live leader is walking its nextIndex back.
+    this.resetElectionTimer(ctx);
+    // Figure 2, AppendEntries receiver step 2 — "Reply false if log doesn't
+    // contain an entry at prevLogIndex whose term matches prevLogTerm."
+    if (m.prevLogIndex > 0) {
+      const prev = s.log[m.prevLogIndex - 1];
+      if (prev === undefined || prev.term !== m.prevLogTerm) {
+        ctx.send(from, {
+          type: 'AppendEntriesResponse',
+          term: s.currentTerm,
+          success: false,
+          matchIndex: 0,
+        });
+        return;
+      }
+    }
+    // Figure 2, receiver steps 3–4 (§5.3, RAFT.md #3) — "If an existing entry
+    // conflicts with a new one (same index but different terms), delete the
+    // existing entry and all that follow it. Append any new entries not
+    // already in the log." An entry already present with the same term is
+    // identical by the Log Matching property and is left alone, so a delayed
+    // or duplicated AppendEntries never truncates.
+    let index = m.prevLogIndex;
+    for (const entry of m.entries) {
+      index += 1;
+      const existing = s.log[index - 1];
+      if (existing === undefined) {
+        s.log.push({ term: entry.term, command: entry.command });
+      } else if (existing.term !== entry.term) {
+        s.log.length = index - 1;
+        s.log.push({ term: entry.term, command: entry.command });
+      }
+    }
+    const lastNewIndex = m.prevLogIndex + m.entries.length;
+    // Figure 2, receiver step 5 — "If leaderCommit > commitIndex, set
+    // commitIndex = min(leaderCommit, index of last new entry)." The commit
+    // index is monotonic (RAFT.md #10): a duplicated older request covering
+    // fewer entries must not pull it back.
+    if (m.leaderCommit > s.commitIndex) {
+      s.commitIndex = Math.max(s.commitIndex, Math.min(m.leaderCommit, lastNewIndex));
+    }
+    this.applyCommitted(ctx);
+    ctx.send(from, {
+      type: 'AppendEntriesResponse',
+      term: s.currentTerm,
+      success: true,
+      matchIndex: lastNewIndex, // D1: what this request covered
+    });
+  }
+
+  // Figure 2, "All Servers" — "If commitIndex > lastApplied: increment
+  // lastApplied, apply log[lastApplied] to state machine." In index order,
+  // exactly once (RAFT.md #10). The state machine here is the applied
+  // command sequence, which is what State Machine Safety is checked against.
+  private applyCommitted(ctx: Ctx<RaftState>): void {
+    const s = ctx.state;
+    while (s.lastApplied < s.commitIndex) {
+      s.lastApplied += 1;
+      s.applied.push((s.log[s.lastApplied - 1] as { command: string }).command);
     }
   }
 
