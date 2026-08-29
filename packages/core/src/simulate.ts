@@ -9,6 +9,7 @@ import { deepFreeze } from './deep-freeze';
 import { EventQueue } from './event-queue';
 import { fnv1a64String } from './hash';
 import type { Invariant, Violation, WorldNode, WorldView } from './invariants';
+import { DefaultNetwork, type NetworkConfig } from './network';
 import { Pcg32 } from './pcg32';
 import type { TraceEvent } from './trace';
 import type { Ctx, Message, NodeId, Process, SimTime } from './types';
@@ -19,6 +20,7 @@ interface DeliverEv {
   from: NodeId;
   msgId: number;
   msg: Message;
+  dup: boolean;
 }
 
 interface TimerEv {
@@ -36,6 +38,7 @@ export interface SimulateOptions<S extends Record<string, unknown>> {
   process: new () => Process<S>;
   // The loop also terminates when the queue is empty or an invariant fails.
   until: { simTime?: SimTime; steps?: number };
+  network?: NetworkConfig; // omitted = immediate, lossless delivery
   invariants?: readonly Invariant<S>[];
 }
 
@@ -69,6 +72,11 @@ export function simulate<S extends Record<string, unknown>>(
     }
   }
 
+  const network = new DefaultNetwork(opts.network ?? {});
+  // The network's own stream (sequence selector 0; nodes use 1..n), so
+  // network randomness never perturbs a protocol's draws.
+  const netRng = new Pcg32(fnv1a64String(`${opts.seed}/network`), 0n);
+
   const lines: string[] = [];
   const events: TraceEvent[] = []; // parsed and frozen at emission: the history invariants see
   const queue = new EventQueue<EngineEvent>();
@@ -88,7 +96,11 @@ export function simulate<S extends Record<string, unknown>>(
     events.push(deepFreeze(JSON.parse(line) as TraceEvent));
   };
 
-  emit({ kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount });
+  emit(
+    opts.network === undefined
+      ? { kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount }
+      : { kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount, network: opts.network },
+  );
 
   const runtimes: NodeRuntime<S>[] = [];
   const byId = (id: NodeId): NodeRuntime<S> => {
@@ -106,9 +118,14 @@ export function simulate<S extends Record<string, unknown>>(
     const copy = JSON.parse(JSON.stringify(msg)) as Message;
     const msgId = nextMsgId++;
     emit({ t: now, seq: traceSeq++, kind: 'send', from: rt.id, to, msgId, msg: copy });
-    // Phase 1 delivery: same simTime, ordered after the current event by seq.
-    // Latency, drops and partitions arrive with the network model (Phase 2).
-    queue.insert(now, { kind: 'deliver', to, from: rt.id, msgId, msg: copy });
+    const routing = network.route({ from: rt.id, to, msgId }, netRng, now);
+    if (routing.kind === 'drop') {
+      emit({ t: now, seq: traceSeq++, kind: 'drop', msgId, reason: routing.reason });
+      return;
+    }
+    for (const d of routing.deliveries) {
+      queue.insert(d.at, { kind: 'deliver', to, from: rt.id, msgId, msg: copy, dup: d.dup });
+    }
   };
 
   // Per-key JSON snapshot of the state, so nested mutation is visible in the
@@ -265,7 +282,11 @@ export function simulate<S extends Record<string, unknown>>(
       if (rt.crashed) {
         emit({ t: now, seq: traceSeq++, kind: 'drop', msgId: ev.msgId, reason: 'crashed' });
       } else {
-        emit({ t: now, seq: traceSeq++, kind: 'deliver', msgId: ev.msgId });
+        emit(
+          ev.dup
+            ? { t: now, seq: traceSeq++, kind: 'deliver', msgId: ev.msgId, dup: true }
+            : { t: now, seq: traceSeq++, kind: 'deliver', msgId: ev.msgId },
+        );
         const before = snapshot(rt.state);
         rt.proc.onMessage(rt.ctx, ev.from, ev.msg);
         emitStatePatch(rt, before);

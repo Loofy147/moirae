@@ -282,3 +282,77 @@ describe('simulate', () => {
     ).toThrow(/nonexistent node 9/);
   });
 });
+
+describe('simulate with a network', () => {
+  const pinger = proc({
+    init: (ctx) => {
+      if (ctx.me === 1) ctx.setTimer('go', 100);
+      return {};
+    },
+    onTimer: (ctx) => {
+      ctx.send(2, { type: 'ping' });
+    },
+  });
+
+  it('records the network config in the header only when one is given', () => {
+    const plain = simulate({ seed: 1, nodes: 2, process: pinger, until: {} });
+    expect(plain.trace[0]).toEqual({ kind: 'header', v: 1, seed: 1, nodes: 2 });
+    const net = simulate({
+      seed: 1,
+      nodes: 2,
+      process: pinger,
+      until: {},
+      network: { latency: [10, 20] },
+    });
+    expect(net.trace[0]).toEqual({
+      kind: 'header',
+      v: 1,
+      seed: 1,
+      nodes: 2,
+      network: { latency: [10, 20] },
+    });
+  });
+
+  it('delivers after a latency within the configured range', () => {
+    const run = simulate({
+      seed: 1,
+      nodes: 2,
+      process: pinger,
+      until: {},
+      network: { latency: [10, 20] },
+    });
+    const deliver = run.trace.find((e) => (e as unknown as Bag)['kind'] === 'deliver') as unknown as Bag;
+    expect(deliver['t']).toBeGreaterThanOrEqual(110);
+    expect(deliver['t']).toBeLessThanOrEqual(120);
+  });
+
+  it('marks the duplicate delivery with dup: true and leaves the original unmarked', () => {
+    const run = simulate({
+      seed: 1,
+      nodes: 2,
+      process: pinger,
+      until: {},
+      network: { duplicateRate: 1 },
+    });
+    const delivers = events(run.trace, 'deliver');
+    expect(delivers).toHaveLength(2);
+    expect(delivers[0]).not.toHaveProperty('dup');
+    expect(delivers[1]?.['dup']).toBe(true);
+    expect(delivers[0]?.['msgId']).toBe(delivers[1]?.['msgId']);
+  });
+
+  it('records a dropped message as drop with reason loss', () => {
+    const run = simulate({
+      seed: 1,
+      nodes: 2,
+      process: pinger,
+      until: {},
+      network: { dropRate: 1 },
+    });
+    expect(events(run.trace, 'send')).toHaveLength(1);
+    expect(events(run.trace, 'deliver')).toHaveLength(0);
+    const drops = events(run.trace, 'drop') as unknown as DropEvent[];
+    expect(drops).toHaveLength(1);
+    expect(drops[0]?.reason).toBe('loss');
+  });
+});

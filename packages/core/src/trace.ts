@@ -3,6 +3,7 @@
 // types and nothing else from the engine. Field order in the emitting literals
 // is the serialization order — keep it stable, it is part of the byte format.
 
+import type { NetworkConfig } from './network';
 import type { Message, NodeId, SimTime } from './types';
 
 export interface TraceHeader {
@@ -10,6 +11,7 @@ export interface TraceHeader {
   v: 1; // trace format version (ADR-003: versioned from day one)
   seed: number;
   nodes: number;
+  network?: NetworkConfig; // present only when a network was configured; absent = default network
 }
 
 export interface InitEvent {
@@ -34,6 +36,7 @@ export interface DeliverEvent {
   seq: number;
   kind: 'deliver';
   msgId: number;
+  dup?: true; // the extra copy of a duplicated message; absent on the original delivery
 }
 
 export interface DropEvent {
