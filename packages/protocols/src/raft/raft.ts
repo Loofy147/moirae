@@ -8,13 +8,20 @@
 // ordering in v0; the discipline is enforced by review, not by a test.
 
 import type { Ctx, Message, NodeId, Process } from '@moira/core';
-import type { AppendEntries, RaftMessage, RequestVote, RequestVoteResponse } from './messages';
+import type {
+  AppendEntries,
+  AppendEntriesResponse,
+  RaftMessage,
+  RequestVote,
+  RequestVoteResponse,
+} from './messages';
 import {
   ELECTION_TIMEOUT_MAX,
   ELECTION_TIMEOUT_MIN,
   ELECTION_TIMER,
   HEARTBEAT_INTERVAL,
   HEARTBEAT_TIMER,
+  type Command,
   type RaftState,
 } from './state';
 
@@ -78,7 +85,54 @@ export class Raft implements Process<RaftState> {
       case 'AppendEntries':
         this.onAppendEntries(ctx, from, m);
         break;
-      // Remaining handlers arrive rule by rule; see the commit history.
+      case 'AppendEntriesResponse':
+        this.onAppendEntriesResponse(ctx, from, m);
+        break;
+    }
+  }
+
+  // §5.3 — "The leader appends the command to its log as a new entry, then
+  // issues AppendEntries RPCs in parallel to each of the other servers to
+  // replicate the entry." This is the leader-side append and nothing more:
+  // client sessions, deduplication and reads (§8) are out of scope (RAFT.md).
+  // A leader only ever appends to its log (RAFT.md #8).
+  propose(ctx: Ctx<RaftState>, command: Command): boolean {
+    const s = ctx.state;
+    if (s.role !== 'leader') return false;
+    s.log.push({ term: s.currentTerm, command }); // persisted before sending
+    for (const peer of ctx.peers) this.sendAppendEntries(ctx, peer);
+    return true;
+  }
+
+  private onAppendEntriesResponse(
+    ctx: Ctx<RaftState>,
+    from: NodeId,
+    m: AppendEntriesResponse,
+  ): void {
+    const s = ctx.state;
+    // RAFT.md #6 — only a leader acts on these, and only for its current
+    // term (a higher term was handled by the term rule; a lower one was
+    // discarded). After stepping down, late responses change nothing.
+    if (s.role !== 'leader' || m.term !== s.currentTerm) return;
+    const key = String(from);
+    if (m.success) {
+      // Figure 2, Leaders — "If successful: update nextIndex and matchIndex
+      // for follower." RAFT.md #7 / deviation D1: from what *that* request
+      // covered, echoed by the follower, never from our current log length.
+      // matchIndex is monotonic: a stale or duplicated response can only
+      // propose a value already passed, which is what makes D1 safe under
+      // duplication and reordering.
+      const known = s.matchIndex[key] ?? 0;
+      if (m.matchIndex > known) {
+        s.matchIndex[key] = m.matchIndex;
+        s.nextIndex[key] = m.matchIndex + 1;
+      }
+    } else {
+      // Figure 2, Leaders — "If AppendEntries fails because of log
+      // inconsistency: decrement nextIndex and retry" (§5.3). One step at a
+      // time, as in the paper; no fast backup.
+      s.nextIndex[key] = Math.max(1, (s.nextIndex[key] ?? s.log.length + 1) - 1);
+      this.sendAppendEntries(ctx, from);
     }
   }
 
