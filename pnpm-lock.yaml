@@ -25,7 +25,11 @@ importers:
 
   packages/core: {}
 
-  packages/protocols: {}
+  packages/protocols:
+    dependencies:
+      '@moira/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 
