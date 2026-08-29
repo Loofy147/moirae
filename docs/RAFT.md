@@ -15,12 +15,21 @@ stub that survives simulated restarts.
 Out: membership changes (§6), log compaction / snapshots (§7), client interaction and linearizable
 reads (§8), pre-vote, leadership transfer, batching, pipelining.
 
+Entries enter the log through `Raft.propose(ctx, command)` — the leader-side append of §5.3 and
+nothing more. The test workload drives it; the shipped class contains no client logic (no sessions,
+no deduplication, no reads). Leaders do not append a no-op entry at the start of their term (that
+is §8 territory), so an entry from an earlier term becomes committed only once an entry of the
+current term is on a majority — which is exactly Figure 8's point, and what scenario 4 checks.
+
 ## Persistent vs volatile state
 
 Persistent on every server, written before responding to any RPC: current term, the candidate voted
-for in the current term, and the log. In our simulator, "persist" means marking the field so it
-survives `ctx.crash()` → restart; it must still be written *before* the response is emitted, because
-the ordering is the thing being tested.
+for in the current term, and the log. In our simulator, "persist" means listing the field in
+`Process.persistent` so it survives a crash → restart (SPEC §3). The discipline stands — every
+handler updates persistent fields before any `ctx.send`, with a comment citing Figure 2 — but the
+ordering is *not observable* in v0: state is snapshotted at the crash event and handlers are
+instantaneous, so no test claims to check it. It becomes testable when crash points inside handlers
+land; that is a deferred engine capability, not an oversight.
 
 Volatile: commit index, last applied index. On a leader, additionally the next index and match index
 per follower, both reinitialised on election.
@@ -44,8 +53,9 @@ specific partition sequence. Figure 8 in the paper is exactly that sequence — 
 **3. Truncating the log on every AppendEntries.**
 The follower deletes existing entries only where an entry genuinely *conflicts* — same index,
 different term. It must not blindly truncate from the previous log index onward, because a delayed
-or duplicated AppendEntries carrying an older suffix would then delete committed entries. Our
-network model duplicates and reorders messages by default, so this bug will surface.
+or duplicated AppendEntries carrying an older suffix would then delete committed entries. The
+engine's default network is immediate and lossless; the scenario tests configure `duplicateRate`
+and a latency range so that this bug surfaces.
 
 **4. The election restriction (§5.4.1).**
 A server refuses its vote if the candidate's log is less up to date than its own. "More up to date"
@@ -56,7 +66,10 @@ comparison backwards or comparing indices first breaks leader completeness.
 The timer resets on: receiving AppendEntries from the *current* leader, granting a vote, and starting
 an election. It does not reset on a rejected AppendEntries, on a stale-term RPC, or on receiving a
 vote request one declines. Over-eager resetting stalls elections in ways that look like liveness bugs
-in the engine.
+in the engine. "Rejected" here means rejected for a stale term: an AppendEntries from the current
+term's leader resets the timer even when its consistency check fails (as in the authors' LogCabin),
+because a lagging follower must not start elections while a live leader is walking its next index
+back.
 
 **6. Acting on stale RPC responses.**
 By the time a response arrives, the term may have advanced or we may no longer be leader. Before
@@ -67,6 +80,15 @@ still matches. In this simulator, delays are large and this path is exercised co
 On a successful AppendEntries, the follower's match index is set from the entries actually sent in
 *that* request, not from the leader's current log length, which may have grown since. Next index
 decrements on failure; match index never moves backwards.
+
+**Deviation D1 from Figure 2.** The paper's AppendEntries response is `(term, success)` and the
+leader infers the matched index from its own next index — wrong under reordering and duplication.
+Here the follower echoes `matchIndex = prevLogIndex + entries.length` in its response and the
+leader sets match index from that. The deviation is safe because the leader's match index is
+monotonic: a stale or duplicated response can only ever propose a value it already passed. That
+property is what makes D1 correct, so it is a test, not a comment — replaying an old success
+response after match index has advanced must not move it backwards
+(`test/raft-07-08-replication.test.ts`).
 
 **8. Leaders never overwrite their own log.**
 A leader only appends. If leader code contains a truncation, it is wrong.
@@ -82,7 +104,8 @@ monotonic and never decreases, even when a new leader's view differs.
 
 ## The five safety properties
 
-These are the invariants worth encoding in `packages/core` (§5, Figure 3):
+These are the invariants worth encoding, in `packages/protocols/src/raft` — they are typed on
+Raft's state, and core stays protocol-agnostic (§5, Figure 3):
 
 | Property | Statement |
 |---|---|
@@ -92,7 +115,15 @@ These are the invariants worth encoding in `packages/core` (§5, Figure 3):
 | Leader Completeness | An entry committed in some term is present in the log of every leader of every later term. |
 | State Machine Safety | If a server has applied an entry at a given index, no server ever applies a different entry at that index. |
 
-v0 ships checkers for Election Safety and Log Matching. The other three are good first
+v0 ships checkers for Election Safety, Log Matching and State Machine Safety — `electionSafety()`,
+`logMatching()`, `stateMachineSafety()`, factories because the first and the last keep a history
+across checks (a leader that stepped down, or an entry applied by a server that then crashed, is
+invisible to a check of current state alone).
+
+**The fuzz gate requires at least one of State Machine Safety or Leader Completeness.** Election
+Safety and Log Matching both hold while the Figure 8 sequence loses a committed entry: there is one
+leader per term, the logs stay mutually consistent, and the data is gone anyway. A fuzz run guarded
+by those two alone is nearly worthless. Leader Completeness and Leader Append-Only are good first
 contributions once the interface is stable.
 
 ## Test scenarios that must pass
@@ -105,6 +136,7 @@ contributions once the interface is stable.
    committed, and the outcome does not violate State Machine Safety.
 5. Duplicated and reordered AppendEntries do not cause a follower to lose committed entries.
 6. Fuzz across 1000 seeds with 2% drop rate and random partitions: no invariant violation.
+   (200 seeds run in CI on every push; 1000 before a release, until the §8 fuzz CLI exists.)
 
 If scenario 4 passes on the first attempt, be suspicious and check that the test actually
 reproduces the sequence rather than trivially succeeding.

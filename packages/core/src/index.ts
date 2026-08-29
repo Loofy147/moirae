@@ -1,4 +1,6 @@
 export { simulate } from './simulate';
+export { Pcg32 } from './pcg32';
+export { fnv1a64String, hex64 } from './hash';
 export type { CrashSchedule, SimulateOptions, SimulationResult } from './simulate';
 export type { Invariant, Violation, WorldNode, WorldView } from './invariants';
 export type { NetworkConfig, Partition } from './network';
