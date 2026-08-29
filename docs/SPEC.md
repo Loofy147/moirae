@@ -106,6 +106,9 @@ derived from the root seed as `hash(rootSeed, nodeId)` so that adding a node doe
 the random stream of existing nodes.
 
 PRNG: a small, self-contained xoshiro128** or PCG32. Written in-repo, not a dependency (ADR-004).
+The engine exports the PRNG (`Pcg32`) and the trace hash (`fnv1a64String`, `hex64`) for tests
+and tooling: the Raft fuzz test derives each seed's fault schedule from the PRNG, so a failing
+seed reproduces exactly.
 
 ## 5. Trace format
 
@@ -209,7 +212,8 @@ engine and read-only). Invariants run after init (step 0) and after every step b
 expensive ones can declare `every: n` steps. The first violation emits a `violation` event and
 ends the run; `simulate()` reports it.
 
-v0 ships `atMostOneLeaderPerTerm` and `logPrefixMatch`.
+v0 ships, in `packages/protocols`, the Figure 3 checkers `electionSafety`, `logMatching` and
+`stateMachineSafety` — see `docs/RAFT.md` for why a fuzz gate needs the third.
 
 ## 8. Fuzzing
 
