@@ -81,9 +81,23 @@ export class Raft implements Process<RaftState> {
 
   private onRequestVote(ctx: Ctx<RaftState>, from: NodeId, m: RequestVote): void {
     const s = ctx.state;
-    // Figure 2, RequestVote RPC receiver: grant if votedFor is null or candidateId.
-    const grant = s.votedFor === null || s.votedFor === m.candidateId;
-    if (grant) s.votedFor = m.candidateId; // persisted before responding
+    // §5.4.1 — election restriction. "If the logs have last entries with
+    // different terms, then the log with the later term is more up-to-date.
+    // If the logs end with the same term, then whichever log is longer is
+    // more up-to-date." The voter denies if its own log is more up-to-date.
+    const lastIndex = s.log.length;
+    const lastTerm = lastIndex > 0 ? (s.log[lastIndex - 1] as { term: number }).term : 0;
+    const candidateUpToDate =
+      m.lastLogTerm > lastTerm || (m.lastLogTerm === lastTerm && m.lastLogIndex >= lastIndex);
+    // Figure 2, RequestVote RPC receiver: "If votedFor is null or candidateId,
+    // and candidate's log is at least as up-to-date as receiver's log, grant."
+    const grant = (s.votedFor === null || s.votedFor === m.candidateId) && candidateUpToDate;
+    if (grant) {
+      s.votedFor = m.candidateId; // persisted before responding
+      // §5.2 — a server that grants a vote resets its election timer
+      // (RAFT.md #5); declining does not.
+      this.resetElectionTimer(ctx);
+    }
     ctx.send(from, { type: 'RequestVoteResponse', term: s.currentTerm, voteGranted: grant });
   }
 
