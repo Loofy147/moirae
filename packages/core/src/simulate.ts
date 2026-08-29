@@ -1,12 +1,14 @@
 // The scheduler (SPEC §4): a single-threaded loop over a priority queue of
 // events totally ordered by (time, seq). One step = pop one event, dispatch
-// it, append the resulting effects to the queue. Determinism is the entire
-// point: every ordering decision goes through the queue's explicit
-// comparator, every random draw through a per-node seeded PRNG, and the
-// trace is serialized at emission time so later mutation cannot reach it.
+// it, append the resulting effects to the queue, run invariants. Determinism
+// is the entire point: every ordering decision goes through the queue's
+// explicit comparator, every random draw through a per-node seeded PRNG, and
+// the trace is serialized at emission time so later mutation cannot reach it.
 
+import { deepFreeze } from './deep-freeze';
 import { EventQueue } from './event-queue';
 import { fnv1a64String } from './hash';
+import type { Invariant, Violation, WorldNode, WorldView } from './invariants';
 import { Pcg32 } from './pcg32';
 import type { TraceEvent } from './trace';
 import type { Ctx, Message, NodeId, Process, SimTime } from './types';
@@ -32,8 +34,9 @@ export interface SimulateOptions<S extends Record<string, unknown>> {
   seed: number;
   nodes: number;
   process: new () => Process<S>;
-  // The loop also terminates when the queue is empty.
+  // The loop also terminates when the queue is empty or an invariant fails.
   until: { simTime?: SimTime; steps?: number };
+  invariants?: readonly Invariant<S>[];
 }
 
 export interface SimulationResult {
@@ -41,6 +44,7 @@ export interface SimulationResult {
   readonly jsonl: string;
   readonly steps: number;
   readonly time: SimTime;
+  readonly violation: Violation | null;
 }
 
 interface NodeRuntime<S> {
@@ -57,19 +61,31 @@ export function simulate<S extends Record<string, unknown>>(
   opts: SimulateOptions<S>,
 ): SimulationResult {
   const nodeCount = opts.nodes;
+  const invariants = opts.invariants ?? [];
+  for (const inv of invariants) {
+    const every = inv.every ?? 1;
+    if (!Number.isInteger(every) || every < 1) {
+      throw new Error(`invariant '${inv.name}': every must be a positive integer, got ${every}`);
+    }
+  }
+
   const lines: string[] = [];
+  const events: TraceEvent[] = []; // parsed and frozen at emission: the history invariants see
   const queue = new EventQueue<EngineEvent>();
   let now: SimTime = 0;
   let traceSeq = 0;
   let nextMsgId = 0;
   let nextTimerGen = 0;
   let steps = 0;
+  let violation: Violation | null = null;
 
   // Serialize immediately: a trace line captures values as they were at
   // emission, so a protocol mutating its state or a sent message afterwards
   // cannot rewrite history. Field order in these literals is the byte format.
   const emit = (event: TraceEvent): void => {
-    lines.push(JSON.stringify(event));
+    const line = JSON.stringify(event);
+    lines.push(line);
+    events.push(deepFreeze(JSON.parse(line) as TraceEvent));
   };
 
   emit({ kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount });
@@ -110,6 +126,7 @@ export function simulate<S extends Record<string, unknown>>(
   };
 
   const emitStatePatch = (rt: NodeRuntime<S>, before: Map<string, string>): void => {
+    if (rt.crashed) return; // a crashed node has no state to report
     const state = rt.state as Record<string, unknown>;
     const patch: Record<string, unknown> = {};
     let changed = false;
@@ -130,6 +147,36 @@ export function simulate<S extends Record<string, unknown>>(
     if (changed) {
       emit({ t: now, seq: traceSeq++, kind: 'state', node: rt.id, patch });
     }
+  };
+
+  // SPEC §7: a deep-frozen copy of every node's state, the crashed set, the
+  // clock and the history. Copying (rather than freezing the live state)
+  // keeps the protocol free to mutate its own state afterwards.
+  const worldView = (): WorldView<S> => {
+    const nodes: WorldNode<S>[] = runtimes.map((rt) =>
+      deepFreeze({
+        id: rt.id,
+        crashed: rt.crashed,
+        state: rt.crashed ? null : (JSON.parse(JSON.stringify(rt.state)) as S),
+      }),
+    );
+    return Object.freeze({ time: now, step: steps, nodes: Object.freeze(nodes), trace: events });
+  };
+
+  // Returns true when an invariant was violated (the loop then stops).
+  const checkInvariants = (): boolean => {
+    let world: WorldView<S> | null = null;
+    for (const inv of invariants) {
+      if (steps % (inv.every ?? 1) !== 0) continue;
+      world ??= worldView();
+      const detail = inv.check(world);
+      if (detail !== null) {
+        emit({ t: now, seq: traceSeq++, kind: 'violation', invariant: inv.name, detail });
+        violation = { invariant: inv.name, detail, step: steps, time: now };
+        return true;
+      }
+    }
+    return false;
   };
 
   for (let id = 1; id <= nodeCount; id++) {
@@ -202,7 +249,8 @@ export function simulate<S extends Record<string, unknown>>(
 
   const untilTime = opts.until.simTime ?? Infinity;
   const untilSteps = opts.until.steps ?? Infinity;
-  while (steps < untilSteps) {
+  let stop = checkInvariants(); // step 0: the initial world must hold too
+  while (!stop && steps < untilSteps) {
     const next = queue.pop();
     if (next === undefined) break;
     if (next.time > untilTime) {
@@ -234,13 +282,14 @@ export function simulate<S extends Record<string, unknown>>(
         emitStatePatch(rt, before);
       }
     }
+    stop = checkInvariants();
   }
 
-  const jsonl = lines.join('\n') + '\n';
   return {
-    trace: lines.map((line) => JSON.parse(line) as TraceEvent),
-    jsonl,
+    trace: events,
+    jsonl: lines.join('\n') + '\n',
     steps,
     time: now,
+    violation,
   };
 }
