@@ -14,3 +14,4 @@ export type {
   RequestVote,
   RequestVoteResponse,
 } from './raft/messages';
+export { electionSafety, logMatching, stateMachineSafety } from './raft/invariants';
