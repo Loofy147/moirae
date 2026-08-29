@@ -101,7 +101,32 @@ export class Raft implements Process<RaftState> {
     if (s.role !== 'leader') return false;
     s.log.push({ term: s.currentTerm, command }); // persisted before sending
     for (const peer of ctx.peers) this.sendAppendEntries(ctx, peer);
+    this.advanceCommitIndex(ctx); // a single-server cluster commits here
     return true;
+  }
+
+  // Figure 2, Leaders — "If there exists an N such that N > commitIndex, a
+  // majority of matchIndex[i] ≥ N, and log[N].term == currentTerm: set
+  // commitIndex = N." §5.4.2 / RAFT.md #2: a leader never counts replicas to
+  // decide that an entry from a previous term is committed — only an entry
+  // from its own term commits by counting, and earlier entries commit
+  // indirectly with it (Figure 8). Skipping the term check loses committed
+  // entries under the Figure 8 sequence.
+  private advanceCommitIndex(ctx: Ctx<RaftState>): void {
+    const s = ctx.state;
+    const cluster = ctx.peers.length + 1;
+    for (let n = s.log.length; n > s.commitIndex; n--) {
+      if ((s.log[n - 1] as { term: number }).term !== s.currentTerm) continue;
+      let replicated = 1; // ourselves
+      for (const peer of ctx.peers) {
+        if ((s.matchIndex[String(peer)] ?? 0) >= n) replicated++;
+      }
+      if (replicated * 2 > cluster) {
+        s.commitIndex = n;
+        break;
+      }
+    }
+    this.applyCommitted(ctx);
   }
 
   private onAppendEntriesResponse(
@@ -126,6 +151,7 @@ export class Raft implements Process<RaftState> {
       if (m.matchIndex > known) {
         s.matchIndex[key] = m.matchIndex;
         s.nextIndex[key] = m.matchIndex + 1;
+        this.advanceCommitIndex(ctx);
       }
     } else {
       // Figure 2, Leaders — "If AppendEntries fails because of log
