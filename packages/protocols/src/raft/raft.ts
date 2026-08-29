@@ -8,11 +8,12 @@
 // ordering in v0; the discipline is enforced by review, not by a test.
 
 import type { Ctx, Message, NodeId, Process } from '@moira/core';
-import type { RaftMessage, RequestVote } from './messages';
+import type { RaftMessage, RequestVote, RequestVoteResponse } from './messages';
 import {
   ELECTION_TIMEOUT_MAX,
   ELECTION_TIMEOUT_MIN,
   ELECTION_TIMER,
+  HEARTBEAT_INTERVAL,
   HEARTBEAT_TIMER,
   type RaftState,
 } from './state';
@@ -71,12 +72,23 @@ export class Raft implements Process<RaftState> {
       case 'RequestVote':
         this.onRequestVote(ctx, from, m);
         break;
+      case 'RequestVoteResponse':
+        this.onRequestVoteResponse(ctx, from, m);
+        break;
       // Remaining handlers arrive rule by rule; see the commit history.
     }
   }
 
-  onTimer(): void {
-    // Handlers arrive rule by rule; see the commit history.
+  onTimer(ctx: Ctx<RaftState>, name: string): void {
+    switch (name) {
+      case ELECTION_TIMER:
+        this.startElection(ctx);
+        break;
+      case HEARTBEAT_TIMER:
+        // §5.2 — leaders send periodic heartbeats to maintain authority.
+        if (ctx.state.role === 'leader') this.sendHeartbeats(ctx);
+        break;
+    }
   }
 
   private onRequestVote(ctx: Ctx<RaftState>, from: NodeId, m: RequestVote): void {
@@ -99,6 +111,103 @@ export class Raft implements Process<RaftState> {
       this.resetElectionTimer(ctx);
     }
     ctx.send(from, { type: 'RequestVoteResponse', term: s.currentTerm, voteGranted: grant });
+  }
+
+  private onRequestVoteResponse(ctx: Ctx<RaftState>, from: NodeId, m: RequestVoteResponse): void {
+    const s = ctx.state;
+    // §5.2 / RAFT.md #6 — a vote counts only for the election it answers:
+    // we must still be a candidate, and the response's term must be our
+    // current term (a higher term was handled by the term rule; a lower one
+    // was discarded). A late vote after we won, lost, or stepped down changes
+    // nothing. Each server's vote counts once, however often it arrives.
+    if (s.role !== 'candidate' || m.term !== s.currentTerm) return;
+    if (m.voteGranted && !s.votesGranted.includes(from)) {
+      s.votesGranted.push(from);
+      if (this.hasMajority(ctx)) this.becomeLeader(ctx);
+    }
+  }
+
+  // §5.2 — "To begin an election, a follower increments its current term and
+  // transitions to candidate state. It then votes for itself and issues
+  // RequestVote RPCs in parallel to each of the other servers." A candidate
+  // whose timer fires again (split vote) starts a new election the same way.
+  private startElection(ctx: Ctx<RaftState>): void {
+    const s = ctx.state;
+    if (s.role === 'leader') return; // a leader runs no election timer
+    s.currentTerm += 1; // persisted before sending
+    s.votedFor = ctx.me;
+    s.role = 'candidate';
+    s.leaderId = null;
+    s.votesGranted = [ctx.me];
+    // §5.2 / RAFT.md #5 — starting an election resets the election timer,
+    // with a fresh random timeout for this election (RAFT.md #9).
+    this.resetElectionTimer(ctx);
+    if (this.hasMajority(ctx)) {
+      this.becomeLeader(ctx); // a single-server cluster elects itself
+      return;
+    }
+    const lastLogIndex = s.log.length;
+    const lastLogTerm = lastLogIndex > 0 ? (s.log[lastLogIndex - 1] as { term: number }).term : 0;
+    for (const peer of ctx.peers) {
+      ctx.send(peer, {
+        type: 'RequestVote',
+        term: s.currentTerm,
+        candidateId: ctx.me,
+        lastLogIndex,
+        lastLogTerm,
+      });
+    }
+  }
+
+  // §5.2 — "A candidate wins an election if it receives votes from a majority
+  // of the servers in the full cluster for the same term."
+  private hasMajority(ctx: Ctx<RaftState>): boolean {
+    const cluster = ctx.peers.length + 1;
+    return ctx.state.votesGranted.length * 2 > cluster;
+  }
+
+  // §5.2 — "Once a candidate wins an election, it becomes leader. It then
+  // sends heartbeat messages to all of the other servers to establish its
+  // authority and prevent new elections."
+  private becomeLeader(ctx: Ctx<RaftState>): void {
+    const s = ctx.state;
+    s.role = 'leader';
+    s.leaderId = ctx.me;
+    s.votesGranted = [];
+    // Figure 2, "Volatile state on leaders (reinitialized after election)":
+    // nextIndex = leader's last log index + 1, matchIndex = 0.
+    s.nextIndex = {};
+    s.matchIndex = {};
+    for (const peer of ctx.peers) {
+      s.nextIndex[String(peer)] = s.log.length + 1;
+      s.matchIndex[String(peer)] = 0;
+    }
+    ctx.cancelTimer(ELECTION_TIMER);
+    this.sendHeartbeats(ctx);
+  }
+
+  private sendHeartbeats(ctx: Ctx<RaftState>): void {
+    for (const peer of ctx.peers) this.sendAppendEntries(ctx, peer);
+    ctx.setTimer(HEARTBEAT_TIMER, HEARTBEAT_INTERVAL);
+  }
+
+  // Figure 2, AppendEntries arguments; §5.3 — the leader sends the entries
+  // from nextIndex onward, preceded by the index and term of the entry just
+  // before them for the consistency check. Empty entries are a heartbeat.
+  private sendAppendEntries(ctx: Ctx<RaftState>, peer: NodeId): void {
+    const s = ctx.state;
+    const nextIndex = s.nextIndex[String(peer)] ?? s.log.length + 1;
+    const prevLogIndex = nextIndex - 1;
+    const prevLogTerm = prevLogIndex > 0 ? (s.log[prevLogIndex - 1] as { term: number }).term : 0;
+    ctx.send(peer, {
+      type: 'AppendEntries',
+      term: s.currentTerm,
+      leaderId: ctx.me,
+      prevLogIndex,
+      prevLogTerm,
+      entries: s.log.slice(prevLogIndex),
+      leaderCommit: s.commitIndex,
+    });
   }
 
   // §5.1 / Figure 2 "Rules for Servers": on discovering a higher term a server

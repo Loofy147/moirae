@@ -29,3 +29,17 @@ describe('#9 election timeouts are randomised from ctx.random()', () => {
     expect(initialTimeoutWithDraw(0.1)).not.toBe(initialTimeoutWithDraw(0.9));
   });
 });
+
+describe('#9 each election draws a fresh timeout', () => {
+  it('two consecutive elections with different draws arm different timeouts', () => {
+    const h = new Harness(3, Raft);
+    h.random = () => 0.1;
+    h.timerCalls.length = 0;
+    h.fire(1, ELECTION_TIMER);
+    h.random = () => 0.9;
+    h.fire(1, ELECTION_TIMER);
+    const delays = h.timersOf(1).filter((t) => t.op === 'set' && t.name === ELECTION_TIMER).map((t) => t.delay);
+    expect(delays).toHaveLength(2);
+    expect(delays[0]).not.toBe(delays[1]);
+  });
+});
