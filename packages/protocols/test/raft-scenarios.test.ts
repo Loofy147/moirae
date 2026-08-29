@@ -8,7 +8,8 @@ import type { Invariant, NetworkConfig, SimulationResult, WorldView } from '@moi
 const PARTITION_GOLDEN_HASH = 'bfe7854ccff30211';
 import { electionSafety, logMatching, stateMachineSafety } from '../src/index';
 import type { RaftState } from '../src/index';
-import { RaftWithLoad } from './workload';
+// The workload driver lives with the examples; see examples/src/workload.ts.
+import { RaftWithLoad } from '../../../examples/src/workload';
 
 // docs/RAFT.md "Test scenarios that must pass", 1–3 and 5, on the real
 // engine: random timeouts, latency, loss, duplication, partitions, crashes.
