@@ -1,9 +1,9 @@
-// The example workload. The shipped Raft has no notion of clients; this
-// subclass arms a `propose` timer on every node and, when it fires on a
-// leader with budget left, appends one command. The budget lives on the
-// process instance: a test driver's counter, deterministic, invisible to the
-// protocol. (packages/protocols/test/workload.ts is the same driver for the
-// protocol's own tests; the examples stay self-contained on purpose.)
+// The workload driver, shared by the examples and by the protocol's own
+// engine-level tests (packages/protocols/test/raft-scenarios.test.ts,
+// raft-fuzz.test.ts). The shipped Raft has no notion of clients; this subclass
+// arms a `propose` timer on every node and, when it fires on a leader with
+// budget left, appends one command. The budget lives on the process instance:
+// a test driver's counter, deterministic, invisible to the protocol.
 
 import type { Ctx } from '@moira/core';
 import { Raft, type RaftState } from '@moira/protocols';
