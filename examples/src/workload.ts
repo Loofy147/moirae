@@ -1,11 +1,12 @@
-// Test-only workload: the shipped Raft class has no notion of clients
-// (docs/RAFT.md). Every node arms a `propose` timer; when it fires on a
-// leader with budget left, the leader appends one command. The budget lives
-// on the process instance, not in ctx.state — it is a test driver's counter,
-// deterministic and invisible to the protocol.
+// The workload driver, shared by the examples and by the protocol's own
+// engine-level tests (packages/protocols/test/raft-scenarios.test.ts,
+// raft-fuzz.test.ts). The shipped Raft has no notion of clients; this subclass
+// arms a `propose` timer on every node and, when it fires on a leader with
+// budget left, appends one command. The budget lives on the process instance:
+// a test driver's counter, deterministic, invisible to the protocol.
 
 import type { Ctx } from '@moira/core';
-import { Raft, type RaftState } from '../src/index';
+import { Raft, type RaftState } from '@moira/protocols';
 
 export const PROPOSE_TIMER = 'propose';
 export const PROPOSE_INTERVAL = 40;

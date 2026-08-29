@@ -3,7 +3,8 @@ import { Pcg32, simulate } from '@moira/core';
 import type { CrashSchedule, NetworkConfig, Partition } from '@moira/core';
 import { electionSafety, logMatching, stateMachineSafety } from '../src/index';
 import type { RaftState } from '../src/index';
-import { RaftWithLoad } from './workload';
+// The workload driver lives with the examples; see examples/src/workload.ts.
+import { RaftWithLoad } from '../../../examples/src/workload';
 
 // docs/RAFT.md scenario 6: many seeds, 2% loss, random partitions (and a
 // crash/restart on half of them), no invariant violation. The schedule for a
