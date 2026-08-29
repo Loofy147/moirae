@@ -23,6 +23,15 @@ importers:
 
   apps/studio: {}
 
+  examples:
+    dependencies:
+      '@moira/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@moira/protocols':
+        specifier: workspace:*
+        version: link:../packages/protocols
+
   packages/core: {}
 
   packages/protocols:

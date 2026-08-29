@@ -6,6 +6,7 @@ export default defineConfig({
       'test/**/*.test.ts',
       'packages/*/test/**/*.test.ts',
       'apps/*/test/**/*.test.ts',
+      'examples/test/**/*.test.ts',
     ],
     watch: false,
     // The lint guard drives the ESLint API and shares CPU with the 200-seed Raft

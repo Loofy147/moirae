@@ -1,5 +1,5 @@
 {
-  "name": "@moira/protocols",
+  "name": "@moira/examples",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,9 +7,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@moira/core": "workspace:*"
-  },
-  "exports": {
-    ".": "./src/index.ts"
+    "@moira/core": "workspace:*",
+    "@moira/protocols": "workspace:*"
   }
 }
