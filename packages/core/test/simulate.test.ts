@@ -356,3 +356,37 @@ describe('simulate with a network', () => {
     expect(drops[0]?.reason).toBe('loss');
   });
 });
+
+describe('simulate with partitions', () => {
+  it('drops cross-boundary sends while partitioned and records the fault edges', () => {
+    const run = simulate({
+      seed: 1,
+      nodes: 3,
+      process: proc({
+        init: (ctx) => {
+          if (ctx.me === 1) {
+            ctx.setTimer('during', 50);
+            ctx.setTimer('after', 100);
+          }
+          return {};
+        },
+        onTimer: (ctx) => {
+          ctx.broadcast({ type: 'ping' });
+        },
+      }),
+      until: {},
+      network: { partitions: [{ groups: [[1, 2], [3]], start: 20, end: 80 }] },
+    });
+    const faults = events(run.trace, 'fault');
+    expect(faults).toEqual([
+      { t: 20, seq: expect.anything() as number, kind: 'fault', fault: 'partition', groups: [[1, 2], [3]] },
+      { t: 80, seq: expect.anything() as number, kind: 'fault', fault: 'heal', groups: [[1, 2], [3]] },
+    ]);
+    const drops = events(run.trace, 'drop') as unknown as DropEvent[];
+    expect(drops).toHaveLength(1);
+    expect(drops[0]?.t).toBe(50);
+    expect(drops[0]?.reason).toBe('partition');
+    // t=50: 1->2 delivered, 1->3 dropped; t=100: both delivered.
+    expect(events(run.trace, 'deliver')).toHaveLength(3);
+  });
+});

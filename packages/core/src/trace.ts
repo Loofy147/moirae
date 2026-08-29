@@ -74,14 +74,31 @@ export interface LogEvent {
   data?: Record<string, unknown>;
 }
 
-export interface FaultEvent {
+export interface CrashFault {
   t: SimTime;
   seq: number;
   kind: 'fault';
-  fault: string;
-  node?: NodeId;
-  groups?: NodeId[][];
+  fault: 'crash';
+  node: NodeId;
 }
+
+export interface PartitionFault {
+  t: SimTime;
+  seq: number;
+  kind: 'fault';
+  fault: 'partition';
+  groups: readonly (readonly NodeId[])[];
+}
+
+export interface HealFault {
+  t: SimTime;
+  seq: number;
+  kind: 'fault';
+  fault: 'heal';
+  groups: readonly (readonly NodeId[])[]; // the partition that just ended
+}
+
+export type FaultEvent = CrashFault | PartitionFault | HealFault;
 
 export interface ViolationEvent {
   t: SimTime;

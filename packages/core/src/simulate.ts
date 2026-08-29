@@ -30,7 +30,17 @@ interface TimerEv {
   gen: number;
 }
 
-type EngineEvent = DeliverEv | TimerEv;
+interface PartitionStartEv {
+  kind: 'partition-start';
+  index: number;
+}
+
+interface PartitionEndEv {
+  kind: 'partition-end';
+  index: number;
+}
+
+type EngineEvent = DeliverEv | TimerEv | PartitionStartEv | PartitionEndEv;
 
 export interface SimulateOptions<S extends Record<string, unknown>> {
   seed: number;
@@ -72,7 +82,7 @@ export function simulate<S extends Record<string, unknown>>(
     }
   }
 
-  const network = new DefaultNetwork(opts.network ?? {});
+  const network = new DefaultNetwork(opts.network ?? {}, nodeCount);
   // The network's own stream (sequence selector 0; nodes use 1..n), so
   // network randomness never perturbs a protocol's draws.
   const netRng = new Pcg32(fnv1a64String(`${opts.seed}/network`), 0n);
@@ -257,6 +267,13 @@ export function simulate<S extends Record<string, unknown>>(
     runtimes.push(rt);
   }
 
+  // The fault schedule goes into the queue before any protocol code runs, so
+  // its seq numbers are fixed by the schedule alone.
+  network.partitions.forEach((p, index) => {
+    queue.insert(p.start, { kind: 'partition-start', index });
+    queue.insert(p.end, { kind: 'partition-end', index });
+  });
+
   for (const rt of runtimes) {
     emit({ t: 0, seq: traceSeq++, kind: 'init', node: rt.id });
     const before = snapshot(undefined);
@@ -291,6 +308,14 @@ export function simulate<S extends Record<string, unknown>>(
         rt.proc.onMessage(rt.ctx, ev.from, ev.msg);
         emitStatePatch(rt, before);
       }
+    } else if (ev.kind === 'partition-start') {
+      network.startPartition(ev.index);
+      const groups = (network.partitions[ev.index] as { groups: readonly (readonly NodeId[])[] }).groups;
+      emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'partition', groups });
+    } else if (ev.kind === 'partition-end') {
+      network.endPartition();
+      const groups = (network.partitions[ev.index] as { groups: readonly (readonly NodeId[])[] }).groups;
+      emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'heal', groups });
     } else {
       const rt = byId(ev.node);
       // A stale generation means the timer was replaced or cancelled; a
