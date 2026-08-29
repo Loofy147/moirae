@@ -1,12 +1,15 @@
 // The scheduler (SPEC §4): a single-threaded loop over a priority queue of
 // events totally ordered by (time, seq). One step = pop one event, dispatch
-// it, append the resulting effects to the queue. Determinism is the entire
-// point: every ordering decision goes through the queue's explicit
-// comparator, every random draw through a per-node seeded PRNG, and the
-// trace is serialized at emission time so later mutation cannot reach it.
+// it, append the resulting effects to the queue, run invariants. Determinism
+// is the entire point: every ordering decision goes through the queue's
+// explicit comparator, every random draw through a per-node seeded PRNG, and
+// the trace is serialized at emission time so later mutation cannot reach it.
 
+import { deepFreeze } from './deep-freeze';
 import { EventQueue } from './event-queue';
 import { fnv1a64String } from './hash';
+import type { Invariant, Violation, WorldNode, WorldView } from './invariants';
+import { DefaultNetwork, type NetworkConfig } from './network';
 import { Pcg32 } from './pcg32';
 import type { TraceEvent } from './trace';
 import type { Ctx, Message, NodeId, Process, SimTime } from './types';
@@ -17,6 +20,7 @@ interface DeliverEv {
   from: NodeId;
   msgId: number;
   msg: Message;
+  dup: boolean;
 }
 
 interface TimerEv {
@@ -26,14 +30,43 @@ interface TimerEv {
   gen: number;
 }
 
-type EngineEvent = DeliverEv | TimerEv;
+interface PartitionStartEv {
+  kind: 'partition-start';
+  index: number;
+}
+
+interface PartitionEndEv {
+  kind: 'partition-end';
+  index: number;
+}
+
+interface CrashEv {
+  kind: 'crash';
+  node: NodeId;
+}
+
+interface RestartEv {
+  kind: 'restart';
+  node: NodeId;
+}
+
+type EngineEvent = DeliverEv | TimerEv | PartitionStartEv | PartitionEndEv | CrashEv | RestartEv;
+
+export interface CrashSchedule {
+  readonly node: NodeId;
+  readonly at: SimTime;
+  readonly restartAt?: SimTime; // omitted = stays down
+}
 
 export interface SimulateOptions<S extends Record<string, unknown>> {
   seed: number;
   nodes: number;
   process: new () => Process<S>;
-  // The loop also terminates when the queue is empty.
+  // The loop also terminates when the queue is empty or an invariant fails.
   until: { simTime?: SimTime; steps?: number };
+  network?: NetworkConfig; // omitted = immediate, lossless delivery
+  faults?: { readonly crashes?: readonly CrashSchedule[] };
+  invariants?: readonly Invariant<S>[];
 }
 
 export interface SimulationResult {
@@ -41,6 +74,7 @@ export interface SimulationResult {
   readonly jsonl: string;
   readonly steps: number;
   readonly time: SimTime;
+  readonly violation: Violation | null;
 }
 
 interface NodeRuntime<S> {
@@ -51,28 +85,50 @@ interface NodeRuntime<S> {
   ctx: Ctx<S>;
   state: S;
   crashed: boolean;
+  persisted: Record<string, unknown>; // the surviving fields, captured at the crash event
 }
 
 export function simulate<S extends Record<string, unknown>>(
   opts: SimulateOptions<S>,
 ): SimulationResult {
   const nodeCount = opts.nodes;
+  const invariants = opts.invariants ?? [];
+  for (const inv of invariants) {
+    const every = inv.every ?? 1;
+    if (!Number.isInteger(every) || every < 1) {
+      throw new Error(`invariant '${inv.name}': every must be a positive integer, got ${every}`);
+    }
+  }
+
+  const network = new DefaultNetwork(opts.network ?? {}, nodeCount);
+  // The network's own stream (sequence selector 0; nodes use 1..n), so
+  // network randomness never perturbs a protocol's draws.
+  const netRng = new Pcg32(fnv1a64String(`${opts.seed}/network`), 0n);
+
   const lines: string[] = [];
+  const events: TraceEvent[] = []; // parsed and frozen at emission: the history invariants see
   const queue = new EventQueue<EngineEvent>();
   let now: SimTime = 0;
   let traceSeq = 0;
   let nextMsgId = 0;
   let nextTimerGen = 0;
   let steps = 0;
+  let violation: Violation | null = null;
 
   // Serialize immediately: a trace line captures values as they were at
   // emission, so a protocol mutating its state or a sent message afterwards
   // cannot rewrite history. Field order in these literals is the byte format.
   const emit = (event: TraceEvent): void => {
-    lines.push(JSON.stringify(event));
+    const line = JSON.stringify(event);
+    lines.push(line);
+    events.push(deepFreeze(JSON.parse(line) as TraceEvent));
   };
 
-  emit({ kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount });
+  emit(
+    opts.network === undefined
+      ? { kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount }
+      : { kind: 'header', v: 1, seed: opts.seed, nodes: nodeCount, network: opts.network },
+  );
 
   const runtimes: NodeRuntime<S>[] = [];
   const byId = (id: NodeId): NodeRuntime<S> => {
@@ -90,9 +146,14 @@ export function simulate<S extends Record<string, unknown>>(
     const copy = JSON.parse(JSON.stringify(msg)) as Message;
     const msgId = nextMsgId++;
     emit({ t: now, seq: traceSeq++, kind: 'send', from: rt.id, to, msgId, msg: copy });
-    // Phase 1 delivery: same simTime, ordered after the current event by seq.
-    // Latency, drops and partitions arrive with the network model (Phase 2).
-    queue.insert(now, { kind: 'deliver', to, from: rt.id, msgId, msg: copy });
+    const routing = network.route({ from: rt.id, to, msgId }, netRng, now);
+    if (routing.kind === 'drop') {
+      emit({ t: now, seq: traceSeq++, kind: 'drop', msgId, reason: routing.reason });
+      return;
+    }
+    for (const d of routing.deliveries) {
+      queue.insert(d.at, { kind: 'deliver', to, from: rt.id, msgId, msg: copy, dup: d.dup });
+    }
   };
 
   // Per-key JSON snapshot of the state, so nested mutation is visible in the
@@ -110,6 +171,7 @@ export function simulate<S extends Record<string, unknown>>(
   };
 
   const emitStatePatch = (rt: NodeRuntime<S>, before: Map<string, string>): void => {
+    if (rt.crashed) return; // a crashed node has no state to report
     const state = rt.state as Record<string, unknown>;
     const patch: Record<string, unknown> = {};
     let changed = false;
@@ -132,6 +194,78 @@ export function simulate<S extends Record<string, unknown>>(
     }
   };
 
+  // A crash snapshots the fields the process declared persistent and loses
+  // the rest (SPEC §3). Timers die with the node; deliveries to it become
+  // drops; its sends are ignored. The trace line lists what survived.
+  const crashNode = (rt: NodeRuntime<S>, cause: 'self' | 'schedule'): void => {
+    if (rt.crashed) return;
+    // A crash inside init() finds no state yet: nothing to persist.
+    const state = (rt.state ?? {}) as Record<string, unknown>;
+    const keep = new Set((rt.proc.persistent ?? []).map(String)); // membership only
+    const persisted: string[] = [];
+    const lost: string[] = [];
+    const kept: Record<string, unknown> = {};
+    for (const key of Object.keys(state)) {
+      if (keep.has(key)) {
+        persisted.push(key);
+        const serialized = JSON.stringify(state[key]);
+        if (serialized !== undefined) kept[key] = JSON.parse(serialized);
+      } else {
+        lost.push(key);
+      }
+    }
+    rt.persisted = deepFreeze(kept); // the snapshot handed to onRestart must not drift
+    rt.crashed = true;
+    rt.timers.clear();
+    emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'crash', node: rt.id, cause, persisted, lost });
+  };
+
+  // Restart = init() for a fresh state, persisted fields overlaid, then the
+  // optional onRestart hook. The first state patch after a restart is a
+  // full snapshot, so the viewer can fold from it.
+  const restartNode = (rt: NodeRuntime<S>): void => {
+    if (!rt.crashed) return;
+    rt.crashed = false;
+    emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'restart', node: rt.id });
+    const before = snapshot(undefined);
+    const fresh = rt.proc.init(rt.ctx);
+    // Overlay a copy: the live state must not alias the frozen snapshot.
+    const revived = JSON.parse(JSON.stringify(rt.persisted)) as Record<string, unknown>;
+    rt.state = { ...fresh, ...revived } as S;
+    rt.proc.onRestart?.(rt.ctx, rt.persisted as Partial<S>);
+    emitStatePatch(rt, before);
+  };
+
+  // SPEC §7: a deep-frozen copy of every node's state, the crashed set, the
+  // clock and the history. Copying (rather than freezing the live state)
+  // keeps the protocol free to mutate its own state afterwards.
+  const worldView = (): WorldView<S> => {
+    const nodes: WorldNode<S>[] = runtimes.map((rt) =>
+      deepFreeze({
+        id: rt.id,
+        crashed: rt.crashed,
+        state: rt.crashed ? null : (JSON.parse(JSON.stringify(rt.state)) as S),
+      }),
+    );
+    return Object.freeze({ time: now, step: steps, nodes: Object.freeze(nodes), trace: events });
+  };
+
+  // Returns true when an invariant was violated (the loop then stops).
+  const checkInvariants = (): boolean => {
+    let world: WorldView<S> | null = null;
+    for (const inv of invariants) {
+      if (steps % (inv.every ?? 1) !== 0) continue;
+      world ??= worldView();
+      const detail = inv.check(world);
+      if (detail !== null) {
+        emit({ t: now, seq: traceSeq++, kind: 'violation', invariant: inv.name, detail });
+        violation = { invariant: inv.name, detail, step: steps, time: now };
+        return true;
+      }
+    }
+    return false;
+  };
+
   for (let id = 1; id <= nodeCount; id++) {
     const peers: NodeId[] = [];
     for (let p = 1; p <= nodeCount; p++) {
@@ -147,6 +281,7 @@ export function simulate<S extends Record<string, unknown>>(
       ctx: undefined as unknown as Ctx<S>,
       state: undefined as unknown as S,
       crashed: false,
+      persisted: {},
     };
     rt.ctx = {
       me: id,
@@ -184,14 +319,30 @@ export function simulate<S extends Record<string, unknown>>(
         );
       },
       crash: () => {
-        if (!rt.crashed) {
-          rt.crashed = true;
-          emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'crash', node: id });
-        }
+        crashNode(rt, 'self');
       },
     };
     runtimes.push(rt);
   }
+
+  // The fault schedule goes into the queue before any protocol code runs, so
+  // its seq numbers are fixed by the schedule alone.
+  network.partitions.forEach((p, index) => {
+    queue.insert(p.start, { kind: 'partition-start', index });
+    queue.insert(p.end, { kind: 'partition-end', index });
+  });
+  (opts.faults?.crashes ?? []).forEach((c, i) => {
+    const where = `faults.crashes[${i}]`;
+    if (!Number.isInteger(c.node) || c.node < 1 || c.node > nodeCount) {
+      throw new Error(`${where}: node ${c.node} does not exist`);
+    }
+    if (!(c.at >= 0)) throw new Error(`${where}: at must be >= 0, got ${c.at}`);
+    if (c.restartAt !== undefined && !(c.restartAt > c.at)) {
+      throw new Error(`${where}: restartAt (${c.restartAt}) must be after at (${c.at})`);
+    }
+    queue.insert(c.at, { kind: 'crash', node: c.node });
+    if (c.restartAt !== undefined) queue.insert(c.restartAt, { kind: 'restart', node: c.node });
+  });
 
   for (const rt of runtimes) {
     emit({ t: 0, seq: traceSeq++, kind: 'init', node: rt.id });
@@ -202,7 +353,8 @@ export function simulate<S extends Record<string, unknown>>(
 
   const untilTime = opts.until.simTime ?? Infinity;
   const untilSteps = opts.until.steps ?? Infinity;
-  while (steps < untilSteps) {
+  let stop = checkInvariants(); // step 0: the initial world must hold too
+  while (!stop && steps < untilSteps) {
     const next = queue.pop();
     if (next === undefined) break;
     if (next.time > untilTime) {
@@ -217,11 +369,27 @@ export function simulate<S extends Record<string, unknown>>(
       if (rt.crashed) {
         emit({ t: now, seq: traceSeq++, kind: 'drop', msgId: ev.msgId, reason: 'crashed' });
       } else {
-        emit({ t: now, seq: traceSeq++, kind: 'deliver', msgId: ev.msgId });
+        emit(
+          ev.dup
+            ? { t: now, seq: traceSeq++, kind: 'deliver', msgId: ev.msgId, dup: true }
+            : { t: now, seq: traceSeq++, kind: 'deliver', msgId: ev.msgId },
+        );
         const before = snapshot(rt.state);
         rt.proc.onMessage(rt.ctx, ev.from, ev.msg);
         emitStatePatch(rt, before);
       }
+    } else if (ev.kind === 'partition-start') {
+      network.startPartition(ev.index);
+      const groups = (network.partitions[ev.index] as { groups: readonly (readonly NodeId[])[] }).groups;
+      emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'partition', groups });
+    } else if (ev.kind === 'partition-end') {
+      network.endPartition();
+      const groups = (network.partitions[ev.index] as { groups: readonly (readonly NodeId[])[] }).groups;
+      emit({ t: now, seq: traceSeq++, kind: 'fault', fault: 'heal', groups });
+    } else if (ev.kind === 'crash') {
+      crashNode(byId(ev.node), 'schedule');
+    } else if (ev.kind === 'restart') {
+      restartNode(byId(ev.node));
     } else {
       const rt = byId(ev.node);
       // A stale generation means the timer was replaced or cancelled; a
@@ -234,13 +402,14 @@ export function simulate<S extends Record<string, unknown>>(
         emitStatePatch(rt, before);
       }
     }
+    stop = checkInvariants();
   }
 
-  const jsonl = lines.join('\n') + '\n';
   return {
-    trace: lines.map((line) => JSON.parse(line) as TraceEvent),
-    jsonl,
+    trace: events,
+    jsonl: lines.join('\n') + '\n',
     steps,
     time: now,
+    violation,
   };
 }

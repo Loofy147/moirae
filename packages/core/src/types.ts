@@ -31,8 +31,14 @@ export interface Ctx<S> {
 }
 
 export interface Process<S> {
+  // Top-level state fields that survive a crash (SPEC §3). Everything else is
+  // lost. The snapshot is taken at the crash event; intra-handler write
+  // ordering is not modelled — see the limitation recorded in SPEC §3.
+  readonly persistent?: readonly (keyof S)[];
   init(ctx: Ctx<S>): S;
   onMessage(ctx: Ctx<S>, from: NodeId, msg: Message): void;
   onTimer(ctx: Ctx<S>, name: string): void;
+  // Called on restart after init(), with the persisted fields already
+  // overlaid onto the fresh state.
   onRestart?(ctx: Ctx<S>, persisted: Partial<S>): void;
 }

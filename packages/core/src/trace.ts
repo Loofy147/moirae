@@ -3,6 +3,7 @@
 // types and nothing else from the engine. Field order in the emitting literals
 // is the serialization order — keep it stable, it is part of the byte format.
 
+import type { NetworkConfig } from './network';
 import type { Message, NodeId, SimTime } from './types';
 
 export interface TraceHeader {
@@ -10,6 +11,7 @@ export interface TraceHeader {
   v: 1; // trace format version (ADR-003: versioned from day one)
   seed: number;
   nodes: number;
+  network?: NetworkConfig; // present only when a network was configured; absent = default network
 }
 
 export interface InitEvent {
@@ -34,6 +36,7 @@ export interface DeliverEvent {
   seq: number;
   kind: 'deliver';
   msgId: number;
+  dup?: true; // the extra copy of a duplicated message; absent on the original delivery
 }
 
 export interface DropEvent {
@@ -71,14 +74,44 @@ export interface LogEvent {
   data?: Record<string, unknown>;
 }
 
-export interface FaultEvent {
+// Self-describing (ADR-003): a reader must be able to tell why a node came
+// back with an empty log without the source that produced the trace.
+export interface CrashFault {
   t: SimTime;
   seq: number;
   kind: 'fault';
-  fault: string;
-  node?: NodeId;
-  groups?: NodeId[][];
+  fault: 'crash';
+  node: NodeId;
+  cause: 'self' | 'schedule'; // ctx.crash() vs the fault schedule
+  persisted: string[]; // state fields that survive, in state key order
+  lost: string[]; // state fields that do not
 }
+
+export interface RestartFault {
+  t: SimTime;
+  seq: number;
+  kind: 'fault';
+  fault: 'restart';
+  node: NodeId;
+}
+
+export interface PartitionFault {
+  t: SimTime;
+  seq: number;
+  kind: 'fault';
+  fault: 'partition';
+  groups: readonly (readonly NodeId[])[];
+}
+
+export interface HealFault {
+  t: SimTime;
+  seq: number;
+  kind: 'fault';
+  fault: 'heal';
+  groups: readonly (readonly NodeId[])[]; // the partition that just ended
+}
+
+export type FaultEvent = CrashFault | RestartFault | PartitionFault | HealFault;
 
 export interface ViolationEvent {
   t: SimTime;

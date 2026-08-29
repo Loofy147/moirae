@@ -62,6 +62,7 @@ interface Ctx<S> {
 }
 
 interface Process<S> {
+  persistent?: readonly (keyof S)[];   // top-level state fields that survive a crash
   init(ctx: Ctx<S>): S;
   onMessage(ctx: Ctx<S>, from: NodeId, msg: Message): void;
   onTimer(ctx: Ctx<S>, name: string): void;
@@ -72,6 +73,20 @@ interface Process<S> {
 A process may only observe the world through `ctx`. Reading another node's state from inside a
 process is not prevented by the type system in v0 — it is prevented by review, and it is the one
 thing that makes a protocol implementation worthless.
+
+**Persistence.** A process declares which top-level state fields survive a crash with
+`persistent`; everything else is lost. On restart the engine runs `init` again for a fresh state,
+overlays the persisted fields onto it, then calls `onRestart` with them. The crash event in the
+trace lists which fields survived and which were lost.
+
+**Limitation, on the record.** State is snapshotted at the crash event. Handlers are instantaneous
+(§2), so there is no crash point inside a handler, and intra-handler write ordering is not
+modelled: a handler that replies and then updates a persistent field is indistinguishable from one
+that does it the other way round. The "responded before persisting" bug class is therefore
+unobservable in v0. Testing it requires crash points inside handlers, which is a future phase and
+a breaking change to this API when it lands. The declarative list was chosen over a
+`ctx.persist(key)` call precisely so the API does not suggest that write ordering is being tested
+when it is not.
 
 ## 4. The scheduler
 
@@ -103,9 +118,13 @@ consumer — CLI output, the studio UI, future tooling.
 {"t":183,  "seq":43,"kind":"deliver",   "msgId":88}
 {"t":183,  "seq":44,"kind":"drop",      "msgId":89,"reason":"partition"}
 {"t":183,  "seq":45,"kind":"state",     "node":3,"patch":{"role":"follower","term":2}}
+{"t":190,  "seq":46,"kind":"deliver",   "msgId":88,"dup":true}
 {"t":200,  "seq":50,"kind":"timer",     "node":1,"name":"election"}
 {"t":200,  "seq":51,"kind":"log",       "node":1,"event":"election-started","data":{"term":3}}
+{"t":300,  "seq":70,"kind":"fault",     "fault":"crash","node":2,"cause":"schedule","persisted":["currentTerm","votedFor","log"],"lost":["role","leaderId"]}
+{"t":450,  "seq":80,"kind":"fault",     "fault":"restart","node":2}
 {"t":900,  "seq":91,"kind":"fault",     "fault":"partition","groups":[[1,2],[3,4,5]]}
+{"t":1200, "seq":95,"kind":"fault",     "fault":"heal","groups":[[1,2],[3,4,5]]}
 {"t":1340, "seq":99,"kind":"violation", "invariant":"atMostOneLeaderPerTerm","detail":"..."}
 ```
 
@@ -115,6 +134,15 @@ A patch holds the changed top-level state fields; a field deleted from the state
 is assigned at send and is how send/deliver/drop are correlated. The header line records the
 trace format version, seed, node count, network config and moira version so a trace is
 self-describing.
+
+Every line is readable without the source that produced it (ADR-003). `drop.reason` is `loss`
+(random loss), `partition` (crossed a partition boundary at send time) or `crashed` (destination
+was down at delivery time). A duplicated message's extra copy is a `deliver` line with
+`dup: true`; the original carries no flag, so a consumer can tell a duplicate from a repeated
+line. `fault` events are `crash` (with `cause`: `self` for `ctx.crash()` or `schedule`, plus the
+`persisted` and `lost` field lists), `restart`, `partition` (the groups) and `heal` (the groups
+that just ended). The header's `network` field is present only when a network was configured;
+absent means immediate, lossless delivery.
 
 A trace is a byte stream, not a text document. Lines end in `\n` (LF) on every platform, and the
 acceptance criterion of byte-identical traces (§10.1) is a hash over those exact bytes. To keep
@@ -126,28 +154,60 @@ is corrupt even though it looks identical in an editor.
 ## 6. Network model
 
 ```ts
-interface NetworkModel {
-  // Called once per send. Returns delivery instructions; all randomness via the engine PRNG.
-  route(msg: InFlight, rng: Rng, now: SimTime): Delivery[];  // [] means dropped
+class DefaultNetwork {
+  // Called once per send. All randomness via the engine's dedicated network PRNG stream.
+  route(msg: InFlight, rng: Rng, now: SimTime): Routing;
 }
+type Routing =
+  | { kind: 'drop'; reason: 'loss' | 'partition' }
+  | { kind: 'deliver'; deliveries: { at: SimTime; dup: boolean }[] };
 ```
 
-`DefaultNetwork` supports: latency drawn from a uniform or lognormal range, independent drop
-probability, duplication probability, and hard partitions defined as a list of disjoint node
-groups with a start and end time. Messages crossing a partition boundary are dropped, not delayed.
+`DefaultNetwork` is the only network model, so it is a concrete class rather than an interface;
+an interface is extracted when a second model actually exists. Deviation from the original
+sketch (`Delivery[]`, empty for dropped): a drop carries its reason, because the trace records it.
+
+Configuration: `latency: [min, max]` (integer milliseconds, uniform, inclusive), `dropRate` and
+`duplicateRate` (probabilities), and `partitions` — hard partitions defined as a list of disjoint
+node groups covering every node, each with a start and end time (active for `start <= t < end`),
+not overlapping in time. Whether a message crosses a partition boundary is decided at send time;
+such messages are dropped, not delayed. With no `network` configured, delivery is immediate and
+lossless and no network randomness is drawn at all.
+
+Randomness comes from a dedicated stream (sequence selector 0; nodes use 1..n) so network
+behaviour never perturbs a protocol's draws, and is drawn in a fixed order per send: drop, then
+duplicate, then one latency per delivery. A partition drop is decided before any draw. That order
+is part of the byte format — changing it changes every trace.
+
+**Lognormal latency is deliberately not offered.** Sampling it needs `Math.log`, `Math.sqrt` and
+`Math.cos` (or `Math.exp`), and ECMAScript does not specify those functions bit-exactly: engines
+may legitimately differ in the last bit. One such draw feeding a delivery time would turn
+byte-identical traces across engines (§10.1) into a matter of luck rather than construction.
+Uniform latency is pure integer arithmetic. Do not add a lognormal option without a deterministic
+in-repo approximation that is itself proven bit-exact across the CI matrix.
 
 ## 7. Invariants
 
 ```ts
-interface Invariant {
+interface Invariant<S> {
   name: string;
-  check(world: WorldView): string | null;   // null = holds, string = violation detail
+  every?: number;                              // check every n steps; default 1
+  check(world: WorldView<S>): string | null;   // null = holds, string = violation detail
+}
+
+interface WorldView<S> {
+  time: SimTime;
+  step: number;
+  nodes: { id: NodeId; crashed: boolean; state: S | null }[];   // ascending by id; null while crashed
+  trace: TraceEvent[];                                            // the history so far
 }
 ```
 
-`WorldView` gives deep-frozen read-only access to every node's state, the set of crashed nodes,
-current simTime, and the event history so far. Invariants run after every step by default;
-expensive ones can declare `every: n` steps.
+`WorldView` is a deep-frozen copy of every node's state (a copy, so the protocol stays free to
+mutate its own), the crashed set, current simTime, and the event history so far (shared with the
+engine and read-only). Invariants run after init (step 0) and after every step by default;
+expensive ones can declare `every: n` steps. The first violation emits a `violation` event and
+ends the run; `simulate()` reports it.
 
 v0 ships `atMostOneLeaderPerTerm` and `logPrefixMatch`.
 
