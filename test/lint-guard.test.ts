@@ -156,3 +156,10 @@ describe('ADR-003: the studio imports only the trace schema type', () => {
     expect(rulesIn(examples)).toContain('@typescript-eslint/no-restricted-imports');
   });
 });
+
+describe('example protocols live under the same ban', () => {
+  it('flags Date in examples/src', async () => {
+    const messages = await lint('examples/src/__lint_guard_fixture__.ts', 'export const t = Date.now();\n');
+    expect(rulesIn(messages)).toContain('no-restricted-globals');
+  });
+});
