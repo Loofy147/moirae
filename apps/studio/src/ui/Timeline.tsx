@@ -74,27 +74,44 @@ export function Timeline({ model, playhead, selected, bare = false, onSeek, onSe
           <rect width="8" height="8" fill="#e9e9e4" />
           <line x1="0" y1="0" x2="0" y2="8" stroke="#9a9a94" strokeWidth="2" />
         </pattern>
+        {/* Nothing past the playhead exists yet: the story is revealed, not previewed. */}
+        <clipPath id="past">
+          <rect x={0} y={0} width={Math.max(xHead, scale.plotLeft)} height={scale.height} />
+        </clipPath>
       </defs>
 
-      <Lanes model={model} scale={scale} />
-      <Partitions model={model} scale={scale} playhead={playhead} />
-      <Arcs model={model} scale={scale} selected={selected} onSelect={onSelect} />
-      <Crashes model={model} scale={scale} />
+      <LaneBackgrounds model={model} scale={scale} />
+      <g clipPath="url(#past)">
+        <Lanes model={model} scale={scale} />
+        <Partitions model={model} scale={scale} playhead={playhead} />
+        <Arcs model={model} scale={scale} selected={selected} onSelect={onSelect} bare={bare} />
+        <Crashes model={model} scale={scale} />
+      </g>
       <Axis ticks={ticks} scale={scale} />
-      {/* The future, veiled: everything right of the playhead is yet to happen. */}
-      <rect
-        x={xHead}
-        y={scale.laneTop(1) - 24}
-        width={Math.max(scale.plotRight - xHead, 0)}
-        height={LANE * model.nodes.length + 24}
-        fill="#fbfbf9"
-        opacity={0.72}
-        pointerEvents="none"
-      />
       <line x1={xHead} y1={scale.laneTop(1) - 24} x2={xHead} y2={scale.height - 16} stroke="#1d1d1b" strokeWidth={2} pointerEvents="none" />
-      {/* Captions sit above the veil: a sentence is either there or not, never half-dimmed. */}
+      {/* Captions are whole sentences: either there or not, never clipped mid-word. */}
       <PartitionCaptions model={model} scale={scale} playhead={playhead} />
     </svg>
+  );
+}
+
+// The stage: empty lanes and their labels, always fully drawn.
+function LaneBackgrounds({ model, scale }: { model: TraceModel; scale: Scale }) {
+  return (
+    <g>
+      {model.nodes.map((node) => {
+        const top = scale.laneTop(node);
+        return (
+          <g key={node}>
+            <rect x={scale.plotLeft} y={top} width={scale.plotRight - scale.plotLeft} height={LANE} fill="#f4f4f0" />
+            <line x1={scale.plotLeft} y1={top + LANE} x2={scale.plotRight} y2={top + LANE} stroke="#e1e1da" />
+            <text x={12} y={scale.laneMid(node) + 5} className="lane-label">
+              node {node}
+            </text>
+          </g>
+        );
+      })}
+    </g>
   );
 }
 
@@ -107,11 +124,6 @@ function Lanes({ model, scale }: { model: TraceModel; scale: Scale }) {
         let lastTerm: number | null = null;
         return (
           <g key={node}>
-            <rect x={scale.plotLeft} y={top} width={scale.plotRight - scale.plotLeft} height={LANE} fill="#f4f4f0" />
-            <line x1={scale.plotLeft} y1={top + LANE} x2={scale.plotRight} y2={top + LANE} stroke="#e1e1da" />
-            <text x={12} y={scale.laneMid(node) + 5} className="lane-label">
-              node {node}
-            </text>
             {intervals.map((iv) => {
               const showTerm = iv.term !== null && iv.term !== lastTerm;
               lastTerm = iv.term;
@@ -199,10 +211,17 @@ function PartitionCaptions({ model, scale, playhead }: { model: TraceModel; scal
             {w.groups.map((group) => {
               const story = groupStory(model, w, group, playhead);
               if (story === null) return null;
-              // Inside the group's own lanes, on the seam between its first two
-              // lanes (or mid-lane for a group of one), away from any wall.
+              // Next to the lane that proves the sentence: the group's leader
+              // lane if it has one, else the seam between its first two lanes
+              // (or mid-lane for a group of one), away from any wall.
+              const leaderLane = group.find((node) =>
+                (model.roles.get(node) ?? []).some((iv) => iv.role === 'leader' && iv.start < w.end && iv.end > w.start),
+              );
               const first = group[0] as number;
-              const y = group.length > 1 ? scale.laneTop(first) + LANE + 4 : scale.laneMid(first) + 4;
+              let y: number;
+              if (leaderLane !== undefined) y = scale.laneTop(leaderLane) + LANE_PAD - 3;
+              else if (group.length > 1) y = scale.laneTop(first) + LANE + 4;
+              else y = scale.laneMid(first) + 4;
               return (
                 <text key={group.join('-')} x={x0 + 8} y={y} className="caption caption-story">
                   {story}
@@ -221,11 +240,13 @@ function Arcs({
   scale,
   selected,
   onSelect,
+  bare,
 }: {
   model: TraceModel;
   scale: Scale;
   selected: number | null;
   onSelect(msgId: number | null): void;
+  bare: boolean;
 }) {
   return (
     <g fill="none">
@@ -235,8 +256,10 @@ function Arcs({
         const y1 = scale.laneMid(m.send.to);
         const type = m.send.msg.type;
         const colour = arcColour(type);
-        // Elections are the story; replication is the background hum.
+        // Elections are the story; replication is the background hum — and in
+        // the recording layout it is not drawn at all.
         const election = isElectionTraffic(type);
+        if (bare && !election) return null;
         const isSelected = selected === m.send.msgId;
         const pick = (e: React.MouseEvent): void => {
           e.stopPropagation();

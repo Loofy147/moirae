@@ -358,3 +358,8 @@ body {
 .studio-bare .legend-item-reply {
   display: none;
 }
+
+/* The recording layout draws no replication traffic, so it lists none. */
+.studio-bare .legend-item-quiet {
+  display: none;
+}
