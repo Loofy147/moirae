@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Pcg32, simulate } from '@moirae/core';
-import type { CrashSchedule, NetworkConfig, Partition } from '@moirae/core';
+import { Pcg32, simulate } from 'moirae-core';
+import type { CrashSchedule, NetworkConfig, Partition } from 'moirae-core';
 import { electionSafety, logMatching, stateMachineSafety } from '../src/index';
 import type { RaftState } from '../src/index';
 // The workload driver lives with the examples; see examples/src/workload.ts.

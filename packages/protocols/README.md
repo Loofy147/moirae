@@ -1,4 +1,4 @@
-# @moirae/protocols
+# moirae-protocols
 
 Protocol implementations for the [moirae](https://github.com/pchrysostomou/moirae) deterministic
 simulator. v0 ships one: Raft.
@@ -16,8 +16,8 @@ Also here, as engine invariants: the Figure 3 safety properties `electionSafety(
 and `stateMachineSafety()`.
 
 ```ts
-import { simulate } from '@moirae/core';
-import { Raft, electionSafety, logMatching, stateMachineSafety } from '@moirae/protocols';
+import { simulate } from 'moirae-core';
+import { Raft, electionSafety, logMatching, stateMachineSafety } from 'moirae-protocols';
 
 const result = simulate({
   seed: 19,

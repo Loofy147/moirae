@@ -9,6 +9,6 @@ export default defineConfig({
     emptyOutDir: false,
     target: 'es2022',
     minify: false,
-    rollupOptions: { external: ['@moirae/core'] },
+    rollupOptions: { external: ['moirae-core'] },
   },
 });

@@ -1,4 +1,4 @@
-# @moirae/core
+# moirae-core
 
 The [moirae](https://github.com/pchrysostomou/moirae) engine: deterministic simulation testing for
 distributed systems, in TypeScript, with zero dependencies. You write a protocol against a small
@@ -39,7 +39,7 @@ number, or a timer.
 ## Run one
 
 ```ts
-import { simulate } from '@moirae/core';
+import { simulate } from 'moirae-core';
 
 const result = simulate<State>({
   seed: 0xc0ffee,

@@ -16,8 +16,8 @@
 // five nodes end with identical logs and identical applied sequences. The
 // trace hash is pinned in examples/test/examples.test.ts.
 
-import { simulate, type SimulationResult } from '@moirae/core';
-import { electionSafety, logMatching, stateMachineSafety, type RaftState } from '@moirae/protocols';
+import { simulate, type SimulationResult } from 'moirae-core';
+import { electionSafety, logMatching, stateMachineSafety, type RaftState } from 'moirae-protocols';
 import { RaftWithLoad } from './workload';
 
 export const name = 'harsh';

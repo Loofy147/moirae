@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { WorldView } from '@moirae/core';
+import type { WorldView } from 'moirae-core';
 import { electionSafety, logMatching, stateMachineSafety } from '../src/index';
 import type { LogEntry, RaftState } from '../src/index';
 

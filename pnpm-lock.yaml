@@ -30,9 +30,6 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
-      '@moirae/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@moirae/examples':
         specifier: workspace:*
         version: link:../../examples
@@ -45,33 +42,36 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.1.1
         version: 6.1.1(vite@8.2.2)
+      moirae-core:
+        specifier: workspace:*
+        version: link:../../packages/core
       vite:
         specifier: ^8.2.2
         version: 8.2.2
 
   examples:
     dependencies:
-      '@moirae/core':
+      moirae-core:
         specifier: workspace:*
         version: link:../packages/core
-      '@moirae/protocols':
+      moirae-protocols:
         specifier: workspace:*
         version: link:../packages/protocols
 
   packages/cli:
     devDependencies:
-      '@moirae/core':
-        specifier: workspace:*
-        version: link:../core
       '@moirae/examples':
         specifier: workspace:*
         version: link:../../examples
-      '@moirae/protocols':
-        specifier: workspace:*
-        version: link:../protocols
       '@moirae/studio':
         specifier: workspace:*
         version: link:../../apps/studio
+      moirae-core:
+        specifier: workspace:*
+        version: link:../core
+      moirae-protocols:
+        specifier: workspace:*
+        version: link:../protocols
       vite:
         specifier: ^8.2.2
         version: 8.2.2
@@ -84,7 +84,7 @@ importers:
 
   packages/protocols:
     dependencies:
-      '@moirae/core':
+      moirae-core:
         specifier: workspace:^
         version: link:../core
     devDependencies:

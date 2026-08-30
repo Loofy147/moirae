@@ -40,7 +40,7 @@ against its naive form, including the Figure 8 sequence.
 // typechecked and linted under the same rules as the shipped protocols, and
 // CI asserts that the README's copy is identical to it.
 
-import { simulate, type Ctx, type Process, type SimulationResult } from '@moirae/core';
+import { simulate, type Ctx, type Process, type SimulationResult } from 'moirae-core';
 
 interface State {
   count: number;
@@ -99,17 +99,17 @@ Three pieces, and a file between them.
 ```
    you write                  moirae runs                                 you look
 +------------------+     +------------------------------------+     +--------------------+
-|  Process         | --> |  engine  (@moirae/core)             | --> |  trace.jsonl       | --> studio:
+|  Process         | --> |  engine  (moirae-core)             | --> |  trace.jsonl       | --> studio:
 |    init          |     |    clock, (time, seq) event queue, |     |    one event per   |     scrub it,
 |    onMessage     |     |    PRNG, network model, faults,    |     |    line; versioned |     or write
 |    onTimer       |     |    invariants                      |     |    the contract    |     your own
 +------------------+     +------------------------------------+     +--------------------+
 ```
 
-- **Engine** — [`packages/core`](packages/core), published as `@moirae/core`: the clock, the
+- **Engine** — [`packages/core`](packages/core), published as `moirae-core`: the clock, the
   `(time, seq)` event queue, the PRNG, the network model, fault injection and invariant checking.
   Zero dependencies.
-- **Protocols** — [`packages/protocols`](packages/protocols), `@moirae/protocols`: `Process`
+- **Protocols** — [`packages/protocols`](packages/protocols), `moirae-protocols`: `Process`
   implementations. Raft today, transcribed from the paper ([`docs/RAFT.md`](docs/RAFT.md)).
   [`examples`](examples) holds the fixed scenarios, with their trace hashes pinned in CI, and the
   sample above.

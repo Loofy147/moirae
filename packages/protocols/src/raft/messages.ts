@@ -2,7 +2,7 @@
 // sender's term first: the term comparison rule (§5.1) runs before anything
 // else, on requests and on responses alike.
 
-import type { Message, NodeId } from '@moirae/core';
+import type { Message, NodeId } from 'moirae-core';
 import type { LogEntry } from './state';
 
 export interface RequestVote extends Message {

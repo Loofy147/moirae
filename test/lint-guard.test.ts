@@ -137,20 +137,20 @@ describe('ADR-003: the studio imports only the trace schema type', () => {
   const STUDIO_SRC = 'apps/studio/src/__lint_guard_fixture__.ts';
 
   it('flags a value import from the engine', async () => {
-    const messages = await lint(STUDIO_SRC, "import { simulate } from '@moirae/core';\nexport const s = simulate;\n");
+    const messages = await lint(STUDIO_SRC, "import { simulate } from 'moirae-core';\nexport const s = simulate;\n");
     expect(rulesIn(messages)).toContain('@typescript-eslint/no-restricted-imports');
   });
 
   it('allows a type-only import of the trace schema', async () => {
     const messages = await lint(
       STUDIO_SRC,
-      "import type { TraceEvent } from '@moirae/core';\nexport const events: TraceEvent[] = [];\n",
+      "import type { TraceEvent } from 'moirae-core';\nexport const events: TraceEvent[] = [];\n",
     );
     expect(messages).toEqual([]);
   });
 
   it('flags protocols and examples, type imports included', async () => {
-    const protocols = await lint(STUDIO_SRC, "import type { RaftState } from '@moirae/protocols';\nexport const s: RaftState | null = null;\n");
+    const protocols = await lint(STUDIO_SRC, "import type { RaftState } from 'moirae-protocols';\nexport const s: RaftState | null = null;\n");
     const examples = await lint(STUDIO_SRC, "import { run } from '@moirae/examples';\nexport const r = run;\n");
     expect(rulesIn(protocols)).toContain('@typescript-eslint/no-restricted-imports');
     expect(rulesIn(examples)).toContain('@typescript-eslint/no-restricted-imports');

@@ -82,13 +82,13 @@ export default tseslint.config(
         {
           paths: [
             {
-              name: '@moirae/core',
+              name: 'moirae-core',
               message:
                 'ADR-003: the studio imports only the trace schema type from the engine — use `import type`.',
               allowTypeImports: true,
             },
             {
-              name: '@moirae/protocols',
+              name: 'moirae-protocols',
               message: 'ADR-003: the studio is a pure function of the trace; it does not import protocols.',
             },
             {
