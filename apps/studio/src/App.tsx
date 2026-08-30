@@ -6,7 +6,11 @@ import { useEffect, useState } from 'react';
 import { deriveModel, type TraceModel } from './trace/model';
 import { parseJsonl } from './trace/parse';
 import { Legend } from './ui/Legend';
+import { MessageDetail } from './ui/MessageDetail';
+import { Scrubber } from './ui/Scrubber';
+import { StatePanel } from './ui/StatePanel';
 import { Timeline } from './ui/Timeline';
+import { usePlayback } from './ui/usePlayback';
 
 type Status =
   | { kind: 'idle' }
@@ -50,12 +54,41 @@ export function App() {
           </p>
         )}
       </header>
-      {status.kind === 'ready' && (
-        <>
-          <Legend model={status.model} />
-          <Timeline model={status.model} />
-        </>
-      )}
+      {status.kind === 'ready' && <Viewer model={status.model} />}
     </main>
+  );
+}
+
+function initialPlayhead(duration: number): number {
+  const raw = new URLSearchParams(window.location.search).get('t');
+  const t = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(t) ? t : duration;
+}
+
+function Viewer({ model }: { model: TraceModel }) {
+  const playback = usePlayback(model.duration, initialPlayhead(model.duration));
+  const [selected, setSelected] = useState<number | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (e.key === ' ') {
+        e.preventDefault();
+        playback.toggle();
+      } else if (e.key === 'ArrowLeft') playback.seek(playback.t - 50);
+      else if (e.key === 'ArrowRight') playback.seek(playback.t + 50);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [playback]);
+
+  return (
+    <>
+      <Legend model={model} />
+      <Scrubber playback={playback} duration={model.duration} />
+      <Timeline model={model} playhead={playback.t} selected={selected} onSeek={playback.seek} onSelect={setSelected} />
+      {selected !== null && <MessageDetail model={model} msgId={selected} />}
+      <StatePanel model={model} t={playback.t} />
+    </>
   );
 }

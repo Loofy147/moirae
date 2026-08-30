@@ -4,4 +4,3 @@ coverage/
 out/
 *.tsbuildinfo
 .eslintcache
-apps/studio/public/*.jsonl

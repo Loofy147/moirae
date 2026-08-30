@@ -32,11 +32,27 @@ function listNodes(nodes: readonly number[]): string {
   return nodes.length === 1 ? `node ${nodes[0]}` : `nodes ${nodes.join(', ')}`;
 }
 
-export function Timeline({ model }: { model: TraceModel }) {
+export interface TimelineProps {
+  readonly model: TraceModel;
+  readonly playhead: number;
+  readonly selected: number | null; // msgId
+  onSeek(t: number): void;
+  onSelect(msgId: number | null): void;
+}
+
+export function Timeline({ model, playhead, selected, onSeek, onSelect }: TimelineProps) {
   const scale = makeScale(model.duration, model.nodes.length);
   const ticks: number[] = [];
   const step = model.duration > 10_000 ? 1000 : 500;
   for (let t = 0; t <= model.duration; t += step) ticks.push(t);
+  const xHead = scale.x(playhead);
+
+  const seekFromEvent = (e: React.MouseEvent<SVGSVGElement>): void => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    if (x < scale.plotLeft || x > scale.plotRight) return;
+    onSeek(((x - scale.plotLeft) / (scale.plotRight - scale.plotLeft)) * model.duration);
+  };
 
   return (
     <svg
@@ -46,6 +62,10 @@ export function Timeline({ model }: { model: TraceModel }) {
       height={scale.height}
       role="img"
       aria-label="trace timeline"
+      onClick={(e) => {
+        onSelect(null);
+        seekFromEvent(e);
+      }}
     >
       <defs>
         <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -56,9 +76,20 @@ export function Timeline({ model }: { model: TraceModel }) {
 
       <Lanes model={model} scale={scale} />
       <Partitions model={model} scale={scale} />
-      <Arcs model={model} scale={scale} />
+      <Arcs model={model} scale={scale} selected={selected} onSelect={onSelect} />
       <Crashes model={model} scale={scale} />
       <Axis ticks={ticks} scale={scale} />
+      {/* The future, veiled: everything right of the playhead is yet to happen. */}
+      <rect
+        x={xHead}
+        y={scale.laneTop(1) - 24}
+        width={Math.max(scale.plotRight - xHead, 0)}
+        height={LANE * model.nodes.length + 24}
+        fill="#fbfbf9"
+        opacity={0.72}
+        pointerEvents="none"
+      />
+      <line x1={xHead} y1={scale.laneTop(1) - 24} x2={xHead} y2={scale.height - 16} stroke="#1d1d1b" strokeWidth={2} pointerEvents="none" />
     </svg>
   );
 }
@@ -162,7 +193,17 @@ function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
   );
 }
 
-function Arcs({ model, scale }: { model: TraceModel; scale: Scale }) {
+function Arcs({
+  model,
+  scale,
+  selected,
+  onSelect,
+}: {
+  model: TraceModel;
+  scale: Scale;
+  selected: number | null;
+  onSelect(msgId: number | null): void;
+}) {
   return (
     <g fill="none">
       {model.messages.map((m) => {
@@ -173,6 +214,11 @@ function Arcs({ model, scale }: { model: TraceModel; scale: Scale }) {
         const colour = arcColour(type);
         // Elections are the story; replication is the background hum.
         const election = isElectionTraffic(type);
+        const isSelected = selected === m.send.msgId;
+        const pick = (e: React.MouseEvent): void => {
+          e.stopPropagation();
+          onSelect(isSelected ? null : m.send.msgId);
+        };
         if (m.drop !== null) {
           // Stop short. A partition drop dies at the wall between the two
           // lanes; any other drop dies part-way toward the receiver.
@@ -180,9 +226,16 @@ function Arcs({ model, scale }: { model: TraceModel; scale: Scale }) {
           const xEnd = scale.x(m.drop.t) + 10;
           const yEnd = wall ?? y0 + (y1 - y0) * 0.35;
           return (
-            <g key={m.send.msgId} stroke="#c0392b" strokeWidth={election ? 1.6 : 0.8} opacity={election ? 0.95 : 0.18}>
+            <g
+              key={m.send.msgId}
+              className="arc"
+              stroke={isSelected ? '#1d1d1b' : '#c0392b'}
+              strokeWidth={isSelected ? 3 : election ? 1.6 : 0.8}
+              opacity={isSelected ? 1 : election ? 0.95 : 0.18}
+              onClick={pick}
+            >
               <path d={`M ${x0} ${y0} L ${xEnd} ${yEnd}`} />
-              {election && (
+              {(election || isSelected) && (
                 <path d={`M ${xEnd - 5} ${yEnd - 5} L ${xEnd + 5} ${yEnd + 5} M ${xEnd - 5} ${yEnd + 5} L ${xEnd + 5} ${yEnd - 5}`} strokeWidth={2} />
               )}
             </g>
@@ -192,14 +245,21 @@ function Arcs({ model, scale }: { model: TraceModel; scale: Scale }) {
           const x1 = scale.x(d.t);
           const dx = Math.max((x1 - x0) / 2, 6);
           return (
-            <path
-              key={`${m.send.msgId}-${k}`}
-              d={`M ${x0} ${y0} C ${x0 + dx} ${y0} ${x1 - dx} ${y1} ${x1} ${y1}`}
-              stroke={colour}
-              strokeWidth={election ? (d.dup ? 2 : 1.4) : 0.7}
-              strokeDasharray={d.dup ? '3 3' : undefined}
-              opacity={election ? 0.8 : 0.1}
-            />
+            <g key={`${m.send.msgId}-${k}`} className="arc" onClick={pick}>
+              <path
+                d={`M ${x0} ${y0} C ${x0 + dx} ${y0} ${x1 - dx} ${y1} ${x1} ${y1}`}
+                stroke={isSelected ? '#1d1d1b' : colour}
+                strokeWidth={isSelected ? 3 : election ? (d.dup ? 2 : 1.4) : 0.7}
+                strokeDasharray={d.dup ? '3 3' : undefined}
+                opacity={isSelected ? 1 : election ? 0.8 : 0.1}
+              />
+              {isSelected && (
+                <>
+                  <circle cx={x0} cy={y0} r={5} fill="#1d1d1b" />
+                  <circle cx={x1} cy={y1} r={5} fill="#1d1d1b" />
+                </>
+              )}
+            </g>
           );
         });
       })}
