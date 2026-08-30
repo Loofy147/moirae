@@ -1,4 +1,4 @@
-# A test that something didn't happen proves nothing until it shows it could have
+# A negative claim is satisfied by an empty stage
 
 There is a GIF at the top of a project I built this summer. Five horizontal lanes, one per node of
 a small Raft cluster, time running left to right. A second and a half in, a dashed red wall drops
@@ -50,8 +50,7 @@ impossibility look identical to a test that only checks absence.
 
 ## The same shape, a month earlier, in a Raft rule
 
-The second time I had seen it — and I am ordering these by the order in which I understood them,
-not the order they happened — was in the Raft implementation itself. Raft leaders track, for each
+The second time I had seen it was in the Raft implementation itself. Raft leaders track, for each
 follower, the highest log index known to be replicated there: the *match index*. One of the rules
 that is classically implemented wrong is that this number must be set from the request that was
 actually answered, never from the leader's current log length, and that it must never move
@@ -117,7 +116,9 @@ telling the wrong story does not.
 ## Why it took three
 
 I want to be honest about why I did not see this until the third time, because "we learned a
-lesson" is a sentence that hides the interesting part.
+lesson" is a sentence that hides the interesting part. I have told the three in the order I
+understood them, not the order they happened — the lint gap came first in time, the fixture last —
+and the distance between those two orders is what this section is about.
 
 Each instance looked like a different kind of problem. The lint gap looked like a tooling coverage
 bug: a glob that did not match an extension. The match-index test looked like a subtlety of one
@@ -143,8 +144,9 @@ later — from an adversarial reviewer, from being told to make the test bite �
 original had already been filed under "fixed".
 
 The project is [moirae](https://github.com/pchrysostomou/moirae), a deterministic simulation
-testing framework for distributed systems; the full record of what broke while building it,
+testing framework for distributed systems. The full record of what broke while building it,
 including this, is in its [devlog](https://github.com/pchrysostomou/moirae/blob/main/docs/devlog.md).
+
 The examples are its. The shape is not. Any test suite that contains the word "never" contains
 this problem somewhere, and the way to find it is to ask, of each such test, what it would take for
 the thing to happen — and whether the test ever lets it.
