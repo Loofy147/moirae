@@ -7,7 +7,7 @@
 // responding to RPCs"). SPEC §3 records that the engine cannot observe this
 // ordering in v0; the discipline is enforced by review, not by a test.
 
-import type { Ctx, Message, NodeId, Process } from '@moira/core';
+import type { Ctx, Message, NodeId, Process } from '@nemea/core';
 import type {
   AppendEntries,
   AppendEntriesResponse,

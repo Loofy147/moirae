@@ -24,8 +24,8 @@
 // leader steps down and one more election follows — the disruptive-server
 // behaviour that pre-vote (out of scope) exists to prevent.
 
-import { simulate, type SimulationResult } from '@moira/core';
-import { electionSafety, logMatching, stateMachineSafety, type RaftState } from '@moira/protocols';
+import { simulate, type SimulationResult } from '@nemea/core';
+import { electionSafety, logMatching, stateMachineSafety, type RaftState } from '@nemea/protocols';
 import { RaftWithLoad } from './workload';
 
 export const name = 'clean-partition';

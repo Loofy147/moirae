@@ -4,7 +4,7 @@ Instructions for Claude Code working in this repository. Read this first, every 
 
 ## What this project is
 
-**moira** is a deterministic simulation testing (DST) framework for distributed systems, plus a
+**nemea** is a deterministic simulation testing (DST) framework for distributed systems, plus a
 visual replay UI. You write a protocol against a tiny interface, run it under a deterministic
 scheduler with injected faults, and when an invariant breaks you get a seed that reproduces the
 failure exactly and a timeline you can scrub through.
@@ -95,7 +95,7 @@ for the thing being denied, the negative assertion is not testing anything.
 
 **Absolute paths in every shell chain.** Working directories persist between commands, and a `cd`
 in one chain silently changes the next. A commit gate once ran inside `apps/studio` and failed on
-a missing `lint` script. Start every chain with `cd /d/moira` (or the absolute path it needs) and
+a missing `lint` script. Start every chain with `cd` to the repository root by absolute path (locally `d:/moira`; the folder kept its old name) and
 refer to files by absolute path — in CI scripts, in verification loops, in one-off commands alike.
 
 ## Things that are deliberately out of scope right now

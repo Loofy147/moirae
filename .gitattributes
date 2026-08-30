@@ -5,3 +5,5 @@
 
 # Traces and trace fixtures are byte streams, not text. Git must never touch them.
 *.jsonl -text
+# Recorded demo: pixels, never text-normalised
+*.gif -text

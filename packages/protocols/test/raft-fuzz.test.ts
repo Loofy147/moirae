@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Pcg32, simulate } from '@moira/core';
-import type { CrashSchedule, NetworkConfig, Partition } from '@moira/core';
+import { Pcg32, simulate } from '@nemea/core';
+import type { CrashSchedule, NetworkConfig, Partition } from '@nemea/core';
 import { electionSafety, logMatching, stateMachineSafety } from '../src/index';
 import type { RaftState } from '../src/index';
 // The workload driver lives with the examples; see examples/src/workload.ts.

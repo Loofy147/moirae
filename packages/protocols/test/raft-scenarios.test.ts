@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fnv1a64String, hex64, simulate } from '@moira/core';
-import type { Invariant, NetworkConfig, SimulationResult, WorldView } from '@moira/core';
+import { fnv1a64String, hex64, simulate } from '@nemea/core';
+import type { Invariant, NetworkConfig, SimulationResult, WorldView } from '@nemea/core';
 
 // The partition scenario's pinned trace hash: Raft plus every engine feature,
 // byte-identical across runs, machines and Node versions (SPEC §10.1). A

@@ -4,7 +4,7 @@
 //
 // A trace arrives one of three ways: a file picked or dropped (produced by
 // anyone, on any machine), a URL (?trace=), or a string embedded by a
-// single-file export (window.__MOIRA_TRACE__). ?t= sets the playhead.
+// single-file export (window.__NEMEA_TRACE__). ?t= sets the playhead.
 
 import { useCallback, useEffect, useState, type DragEvent } from 'react';
 import { deriveModel, type TraceModel } from './trace/model';
@@ -35,7 +35,7 @@ function traceUrl(raw: string): string | null {
 
 function explain(err: unknown): string {
   if (err instanceof TraceParseError) {
-    return `${err.message}. This does not look like a moira v1 trace — expected JSONL with a header line first (SPEC §5).`;
+    return `${err.message}. This does not look like a nemea v1 trace — expected JSONL with a header line first (SPEC §5).`;
   }
   return err instanceof Error ? err.message : String(err);
 }
@@ -63,7 +63,7 @@ export function App() {
   );
 
   useEffect(() => {
-    const embedded = (window as unknown as { __MOIRA_TRACE__?: unknown }).__MOIRA_TRACE__;
+    const embedded = (window as unknown as { __NEMEA_TRACE__?: unknown }).__NEMEA_TRACE__;
     if (typeof embedded === 'string') {
       load('embedded trace', embedded);
       return;
@@ -91,11 +91,12 @@ export function App() {
     if (file !== undefined) loadFile(file);
   };
 
+  const isBare = bare();
   return (
-    <main className="studio" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-      <header className="studio-header">
+    <main className={isBare ? 'studio studio-bare' : 'studio'} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+      <header className="studio-header" hidden={isBare && status.kind === 'ready'}>
         <div className="studio-title">
-          <h1>moira studio</h1>
+          <h1>nemea studio</h1>
           <label className="file-button">
             open a trace…
             <input
@@ -131,7 +132,7 @@ function Landing() {
   return (
     <section className="landing">
       <p>
-        Drop a <code>.jsonl</code> trace here, or open one with the button above. A trace is what the moira engine
+        Drop a <code>.jsonl</code> trace here, or open one with the button above. A trace is what the nemea engine
         writes; it replays byte for byte on any machine.
       </p>
       <p className="muted">
@@ -148,9 +149,16 @@ function initialPlayhead(duration: number): number {
   return Number.isFinite(t) ? t : duration;
 }
 
+// ?chrome=0 shows the legend and the timeline alone — for recordings and
+// embeds; the playhead still comes from ?t=.
+function bare(): boolean {
+  return new URLSearchParams(window.location.search).get('chrome') === '0';
+}
+
 function Viewer({ model }: { model: TraceModel }) {
   const playback = usePlayback(model.duration, initialPlayhead(model.duration));
   const [selected, setSelected] = useState<number | null>(null);
+  const isBare = bare();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -165,6 +173,14 @@ function Viewer({ model }: { model: TraceModel }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [playback]);
 
+  if (isBare) {
+    return (
+      <div className="bare">
+        <Legend model={model} />
+        <Timeline model={model} playhead={playback.t} selected={null} bare onSeek={playback.seek} onSelect={() => undefined} />
+      </div>
+    );
+  }
   return (
     <>
       <Legend model={model} />

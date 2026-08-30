@@ -5,7 +5,7 @@
 // a node's lane; a field named `currentTerm` (or `term`) labels it. When a
 // trace has neither, `conventions` says so and the UI must say so too.
 
-import type { DeliverEvent, DropEvent, SendEvent, TraceEvent, TraceHeader } from '@moira/core';
+import type { DeliverEvent, DropEvent, SendEvent, TraceEvent, TraceHeader } from '@nemea/core';
 import type { ParsedTrace } from './parse';
 
 type Event = Exclude<TraceEvent, TraceHeader>;

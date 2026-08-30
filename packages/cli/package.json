@@ -1,0 +1,48 @@
+{
+  "name": "nemea",
+  "version": "0.1.0",
+  "description": "Deterministic simulation testing for distributed systems, with a visual trace replay. `nemea demo` runs a 5-node Raft cluster through a partition and shows you the failure.",
+  "license": "Apache-2.0",
+  "author": "Prodromos Chrysostomou",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pchrysostomou/nemea.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/pchrysostomou/nemea#readme",
+  "bugs": "https://github.com/pchrysostomou/nemea/issues",
+  "keywords": [
+    "deterministic-simulation",
+    "distributed-systems",
+    "raft",
+    "testing",
+    "simulation",
+    "trace",
+    "replay"
+  ],
+  "type": "module",
+  "bin": {
+    "nemea": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@nemea/core": "workspace:*",
+    "@nemea/examples": "workspace:*",
+    "@nemea/protocols": "workspace:*",
+    "@nemea/studio": "workspace:*",
+    "vite": "^8.2.2"
+  }
+}

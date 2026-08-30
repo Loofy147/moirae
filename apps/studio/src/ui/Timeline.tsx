@@ -5,7 +5,7 @@
 
 import type { TraceModel, PartitionWindow } from '../trace/model';
 import { roleColour } from '../trace/labels';
-import { LANE, LANE_PAD, formatTime, makeScale, type Scale, WIDTH } from './layout';
+import { BARE_GUTTER, BARE_WIDTH, LANE, LANE_PAD, formatTime, makeScale, type Scale, WIDTH } from './layout';
 
 const ARC_COLOURS: Readonly<Record<string, string>> = {
   RequestVote: '#e0a100',
@@ -36,12 +36,14 @@ export interface TimelineProps {
   readonly model: TraceModel;
   readonly playhead: number;
   readonly selected: number | null; // msgId
+  readonly bare?: boolean; // recording layout: narrower frame, larger type
   onSeek(t: number): void;
   onSelect(msgId: number | null): void;
 }
 
-export function Timeline({ model, playhead, selected, onSeek, onSelect }: TimelineProps) {
-  const scale = makeScale(model.duration, model.nodes.length);
+export function Timeline({ model, playhead, selected, bare = false, onSeek, onSelect }: TimelineProps) {
+  const width = bare ? BARE_WIDTH : WIDTH;
+  const scale = makeScale(model.duration, model.nodes.length, width, bare ? BARE_GUTTER : undefined);
   const ticks: number[] = [];
   const step = model.duration > 10_000 ? 1000 : 500;
   for (let t = 0; t <= model.duration; t += step) ticks.push(t);
@@ -49,7 +51,7 @@ export function Timeline({ model, playhead, selected, onSeek, onSelect }: Timeli
 
   const seekFromEvent = (e: React.MouseEvent<SVGSVGElement>): void => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * WIDTH;
+    const x = ((e.clientX - rect.left) / rect.width) * width;
     if (x < scale.plotLeft || x > scale.plotRight) return;
     onSeek(((x - scale.plotLeft) / (scale.plotRight - scale.plotLeft)) * model.duration);
   };
@@ -57,8 +59,8 @@ export function Timeline({ model, playhead, selected, onSeek, onSelect }: Timeli
   return (
     <svg
       className="timeline"
-      viewBox={`0 0 ${WIDTH} ${scale.height}`}
-      width={WIDTH}
+      viewBox={`0 0 ${width} ${scale.height}`}
+      width={width}
       height={scale.height}
       role="img"
       aria-label="trace timeline"
@@ -72,25 +74,44 @@ export function Timeline({ model, playhead, selected, onSeek, onSelect }: Timeli
           <rect width="8" height="8" fill="#e9e9e4" />
           <line x1="0" y1="0" x2="0" y2="8" stroke="#9a9a94" strokeWidth="2" />
         </pattern>
+        {/* Nothing past the playhead exists yet: the story is revealed, not previewed. */}
+        <clipPath id="past">
+          <rect x={0} y={0} width={Math.max(xHead, scale.plotLeft)} height={scale.height} />
+        </clipPath>
       </defs>
 
-      <Lanes model={model} scale={scale} />
-      <Partitions model={model} scale={scale} />
-      <Arcs model={model} scale={scale} selected={selected} onSelect={onSelect} />
-      <Crashes model={model} scale={scale} />
+      <LaneBackgrounds model={model} scale={scale} />
+      <g clipPath="url(#past)">
+        <Lanes model={model} scale={scale} />
+        <Partitions model={model} scale={scale} playhead={playhead} />
+        <Arcs model={model} scale={scale} selected={selected} onSelect={onSelect} bare={bare} />
+        <Crashes model={model} scale={scale} />
+      </g>
       <Axis ticks={ticks} scale={scale} />
-      {/* The future, veiled: everything right of the playhead is yet to happen. */}
-      <rect
-        x={xHead}
-        y={scale.laneTop(1) - 24}
-        width={Math.max(scale.plotRight - xHead, 0)}
-        height={LANE * model.nodes.length + 24}
-        fill="#fbfbf9"
-        opacity={0.72}
-        pointerEvents="none"
-      />
       <line x1={xHead} y1={scale.laneTop(1) - 24} x2={xHead} y2={scale.height - 16} stroke="#1d1d1b" strokeWidth={2} pointerEvents="none" />
+      {/* Captions are whole sentences: either there or not, never clipped mid-word. */}
+      <PartitionCaptions model={model} scale={scale} playhead={playhead} />
     </svg>
+  );
+}
+
+// The stage: empty lanes and their labels, always fully drawn.
+function LaneBackgrounds({ model, scale }: { model: TraceModel; scale: Scale }) {
+  return (
+    <g>
+      {model.nodes.map((node) => {
+        const top = scale.laneTop(node);
+        return (
+          <g key={node}>
+            <rect x={scale.plotLeft} y={top} width={scale.plotRight - scale.plotLeft} height={LANE} fill="#f4f4f0" />
+            <line x1={scale.plotLeft} y1={top + LANE} x2={scale.plotRight} y2={top + LANE} stroke="#e1e1da" />
+            <text x={12} y={scale.laneMid(node) + 5} className="lane-label">
+              node {node}
+            </text>
+          </g>
+        );
+      })}
+    </g>
   );
 }
 
@@ -103,11 +124,6 @@ function Lanes({ model, scale }: { model: TraceModel; scale: Scale }) {
         let lastTerm: number | null = null;
         return (
           <g key={node}>
-            <rect x={scale.plotLeft} y={top} width={scale.plotRight - scale.plotLeft} height={LANE} fill="#f4f4f0" />
-            <line x1={scale.plotLeft} y1={top + LANE} x2={scale.plotRight} y2={top + LANE} stroke="#e1e1da" />
-            <text x={12} y={scale.laneMid(node) + 5} className="lane-label">
-              node {node}
-            </text>
             {intervals.map((iv) => {
               const showTerm = iv.term !== null && iv.term !== lastTerm;
               lastTerm = iv.term;
@@ -143,10 +159,14 @@ function Lanes({ model, scale }: { model: TraceModel; scale: Scale }) {
   );
 }
 
-function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
+function Partitions({ model, scale, playhead }: { model: TraceModel; scale: Scale; playhead: number }) {
   return (
     <g>
       {model.partitions.map((w) => {
+        // A partition exists on screen from the moment it happens: the wall,
+        // its caption and the running count appear when the playhead reaches
+        // it, not before.
+        if (playhead < w.start) return null;
         const x0 = scale.x(w.start);
         const x1 = scale.x(w.end);
         const walls: number[] = [];
@@ -155,8 +175,6 @@ function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
           const b = model.nodes[k + 1] as number;
           if (groupOf(w, a) !== groupOf(w, b)) walls.push(scale.laneTop(b));
         }
-        const smaller = [...w.groups].sort((g1, g2) => g1.length - g2.length)[0] ?? [];
-        const rest = w.groups.filter((g) => g !== smaller).flat();
         return (
           <g key={w.start}>
             <rect
@@ -170,18 +188,42 @@ function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
             {walls.map((y) => (
               <line key={y} x1={x0} y1={y} x2={x1} y2={y} stroke="#c0392b" strokeWidth={4} strokeDasharray="10 6" />
             ))}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function PartitionCaptions({ model, scale, playhead }: { model: TraceModel; scale: Scale; playhead: number }) {
+  return (
+    <g pointerEvents="none">
+      {model.partitions.map((w) => {
+        if (playhead < w.start) return null;
+        const x0 = scale.x(w.start);
+        const smaller = [...w.groups].sort((g1, g2) => g1.length - g2.length)[0] ?? [];
+        const rest = w.groups.filter((g) => g !== smaller).flat();
+        return (
+          <g key={w.start}>
             <text x={x0 + 6} y={scale.laneTop(1) - 8} className="caption caption-partition">
               Partition — {listNodes(smaller)} cut off from {listNodes(rest)} ({formatTime(w.start)}–{formatTime(w.end)})
             </text>
             {w.groups.map((group) => {
-              const story = groupStory(model, w, group);
+              const story = groupStory(model, w, group, playhead);
               if (story === null) return null;
-              // Inside the group's own lanes, on the seam between its first two
-              // lanes (or mid-lane for a group of one), away from any wall.
+              // Next to the lane that proves the sentence: the group's leader
+              // lane if it has one, else the seam between its first two lanes
+              // (or mid-lane for a group of one), away from any wall.
+              const leaderLane = group.find((node) =>
+                (model.roles.get(node) ?? []).some((iv) => iv.role === 'leader' && iv.start < w.end && iv.end > w.start),
+              );
               const first = group[0] as number;
-              const y = group.length > 1 ? scale.laneTop(first) + LANE + 4 : scale.laneMid(first) + 4;
+              let y: number;
+              if (leaderLane !== undefined) y = scale.laneTop(leaderLane) + LANE_PAD - 3;
+              else if (group.length > 1) y = scale.laneTop(first) + LANE + 4;
+              else y = scale.laneMid(first) + 4;
               return (
-                <text key={group.join("-")} x={x0 + 8} y={y} className="caption caption-story">
+                <text key={group.join('-')} x={x0 + 8} y={y} className="caption caption-story">
                   {story}
                 </text>
               );
@@ -198,11 +240,13 @@ function Arcs({
   scale,
   selected,
   onSelect,
+  bare,
 }: {
   model: TraceModel;
   scale: Scale;
   selected: number | null;
   onSelect(msgId: number | null): void;
+  bare: boolean;
 }) {
   return (
     <g fill="none">
@@ -212,8 +256,10 @@ function Arcs({
         const y1 = scale.laneMid(m.send.to);
         const type = m.send.msg.type;
         const colour = arcColour(type);
-        // Elections are the story; replication is the background hum.
+        // Elections are the story; replication is the background hum — and in
+        // the recording layout it is not drawn at all.
         const election = isElectionTraffic(type);
+        if (bare && !election) return null;
         const isSelected = selected === m.send.msgId;
         const pick = (e: React.MouseEvent): void => {
           e.stopPropagation();
@@ -271,24 +317,32 @@ function Arcs({
 
 // A plain-word sentence about what a group did inside a partition window,
 // computed from the role convention: how many times its nodes tried to
-// become leader, and whether any succeeded. Null when there is nothing to say.
-export function groupStory(model: TraceModel, w: PartitionWindow, group: readonly number[]): string | null {
-  if (!model.conventions.role) return null;
+// become leader, and whether any succeeded. Counted only up to the playhead,
+// so the failures pile up as the viewer watches rather than being announced
+// in advance. Null when there is nothing to say.
+export function groupStory(model: TraceModel, w: PartitionWindow, group: readonly number[], playhead: number): string | null {
+  if (!model.conventions.role || playhead < w.start) return null;
+  const until = Math.min(w.end, playhead);
+  const ongoing = playhead < w.end;
   let attempts = 0;
   let won = 0;
   let ledThroughout = false;
   for (const node of group) {
     for (const iv of model.roles.get(node) ?? []) {
-      const inside = iv.start >= w.start && iv.start < w.end;
+      const inside = iv.start >= w.start && iv.start < until;
       if (iv.role === 'candidate' && inside) attempts++;
       if (iv.role === 'leader' && inside) won++;
-      if (iv.role === 'leader' && iv.start < w.start && iv.end >= w.end) ledThroughout = true;
+      if (iv.role === 'leader' && iv.start < w.start && iv.end >= until) ledThroughout = true;
     }
   }
   const who = listNodes(group);
-  if (attempts === 0 && won === 0) return ledThroughout ? `${who}: kept their leader` : null;
-  if (won === 0) return `${who} tried to elect a leader ${attempts} times — none won`;
-  return `${who} elected a leader (${attempts} ${attempts === 1 ? 'attempt' : 'attempts'})`;
+  const n = `${attempts} ${attempts === 1 ? 'attempt' : 'attempts'}`;
+  if (attempts === 0 && won === 0) {
+    if (ledThroughout) return `${who}: kept their leader`;
+    return ongoing ? `${who}: cut off` : null;
+  }
+  if (won === 0) return ongoing ? `${who}: ${n} so far, none won` : `${who} tried to elect a leader ${attempts} times — none won`;
+  return `${who} elected a leader (${n})`;
 }
 
 // The y of the first group boundary an arc from lane a to lane b crosses,

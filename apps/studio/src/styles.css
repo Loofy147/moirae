@@ -305,3 +305,61 @@ body {
   padding: 1px 5px;
   border-radius: 3px;
 }
+
+.studio-bare {
+  padding: 6px 10px;
+}
+
+.studio-bare .timeline {
+  margin-top: 6px;
+}
+
+/* Recording layout: drawn 1:1 at 1000px, type sized to survive an 800px
+   README column and, for the captions, a phone. */
+.studio-bare .legend {
+  font-size: 15px;
+  gap: 6px;
+}
+
+.studio-bare .legend-title {
+  font-size: 12px;
+  min-width: 96px;
+}
+
+.studio-bare .legend-chip {
+  width: 26px;
+  height: 14px;
+}
+
+.studio-bare .lane-label {
+  font-size: 17px;
+}
+
+.studio-bare .term-label {
+  font-size: 13px;
+}
+
+.studio-bare .tick {
+  font-size: 13px;
+}
+
+.studio-bare .caption-story,
+.studio-bare .caption-partition {
+  font-size: 22px;
+  stroke-width: 7px;
+}
+
+.studio-bare .caption-crash {
+  font-size: 15px;
+}
+
+/* Replies are the faint arcs; the recording legend keeps only what the eye
+   is meant to follow. */
+.studio-bare .legend-item-reply {
+  display: none;
+}
+
+/* The recording layout draws no replication traffic, so it lists none. */
+.studio-bare .legend-item-quiet {
+  display: none;
+}
