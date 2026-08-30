@@ -124,6 +124,14 @@ or replace the engine behind it, without touching the other side.
 - Why TypeScript, and why the engine has zero dependencies: [`docs/DECISIONS.md`](docs/DECISIONS.md)
   (ADR-001 and ADR-004).
 
+## Reading
+
+- [A negative claim is satisfied by an empty stage](docs/writing/negative-assertions.md) — why a
+  test that asserts something did not happen must also prove it could have, through three cases
+  from this project.
+- [Devlog](docs/devlog.md) — what broke while building this, phase by phase, and what each break
+  changed.
+
 ## Determinism, enforced
 
 Same seed, same trace, byte for byte — across runs, machines and Node versions. CI hashes the
