@@ -114,6 +114,8 @@ export class Harness<S extends Record<string, unknown>> {
       },
       now: () => 0,
       random: () => this.random(),
+      // The engine's mapping, so a controlled random() steers randomInt too.
+      randomInt: (min, max) => min + Math.floor(this.random() * (max - min + 1)),
       send: (to, msg) => {
         outbox.push({ from: id, to, msg: JSON.parse(JSON.stringify(msg)) as Message });
       },
