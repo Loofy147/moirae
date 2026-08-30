@@ -1,12 +1,48 @@
 {
   "name": "@nemea/core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "prepack": "vite build && tsc -p tsconfig.build.json"
   },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "description": "The nemea engine: deterministic simulation testing for distributed systems. Clock, event queue, PRNG, network faults, invariants, JSONL trace. Zero dependencies.",
+  "license": "Apache-2.0",
+  "author": "Prodromos Chrysostomou",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pchrysostomou/nemea.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/pchrysostomou/nemea#readme",
+  "keywords": [
+    "deterministic-simulation",
+    "distributed-systems",
+    "testing",
+    "simulation",
+    "raft"
+  ],
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "devDependencies": {
+    "vite": "^8.2.2"
   }
 }

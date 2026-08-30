@@ -58,13 +58,39 @@ importers:
         specifier: workspace:*
         version: link:../packages/protocols
 
-  packages/core: {}
+  packages/cli:
+    devDependencies:
+      '@nemea/core':
+        specifier: workspace:*
+        version: link:../core
+      '@nemea/examples':
+        specifier: workspace:*
+        version: link:../../examples
+      '@nemea/protocols':
+        specifier: workspace:*
+        version: link:../protocols
+      '@nemea/studio':
+        specifier: workspace:*
+        version: link:../../apps/studio
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2
+
+  packages/core:
+    devDependencies:
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2
 
   packages/protocols:
     dependencies:
       '@nemea/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
+    devDependencies:
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2
 
 packages:
 
