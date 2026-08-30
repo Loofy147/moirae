@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clean } from '@nemea/examples';
+import { clean } from '@moirae/examples';
 import { summarize } from '../src/summary';
 
 describe('summarize', () => {

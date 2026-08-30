@@ -29,16 +29,16 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
-      - run: pnpm --filter @nemea/studio build
+      - run: pnpm --filter @moirae/studio build
       # The stranger's path: pack the CLI, install the tarball into an empty
       # directory with no workspace and no lockfile, and run the demo cold.
-      - run: pnpm --filter nemea pack --pack-destination "$RUNNER_TEMP/pack"
+      - run: pnpm --filter moirae pack --pack-destination "$RUNNER_TEMP/pack"
       - run: |
           set -euo pipefail
           dir="$(mktemp -d)"
           cd "$dir"
           npm init -y >/dev/null
-          npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/nemea-*.tgz
-          time npx nemea demo --no-open --no-serve
-          test -s nemea-demo.jsonl
-          npx nemea --version
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/moirae-*.tgz
+          time npx moirae demo --no-open --no-serve
+          test -s moirae-demo.jsonl
+          npx moirae --version

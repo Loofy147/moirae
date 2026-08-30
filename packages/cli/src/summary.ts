@@ -15,7 +15,7 @@ function fmt(t: number): string {
 export function summarize(jsonl: string): string {
   const lines = jsonl.split('\n').filter((l) => l.length > 0);
   const header = JSON.parse(lines[0] ?? '{}') as { seed?: number; nodes?: number; kind?: string };
-  if (header.kind !== 'header') throw new Error('not a nemea trace: no header line');
+  if (header.kind !== 'header') throw new Error('not a moirae trace: no header line');
   const events = lines.slice(1).map((l) => JSON.parse(l) as Ev);
   const nodes = header.nodes ?? 0;
   const out: string[] = [];

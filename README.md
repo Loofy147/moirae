@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/nemea-demo.gif" width="800" alt="Five Raft nodes on a timeline. A partition cuts two of them off; they turn amber again and again trying to elect a leader, every vote request dies at the wall, and they never turn blue. The other three keep their leader. When the wall lifts, one election settles it.">
+  <img src="docs/moirae-demo.gif" width="800" alt="Five Raft nodes on a timeline. A partition cuts two of them off; they turn amber again and again trying to elect a leader, every vote request dies at the wall, and they never turn blue. The other three keep their leader. When the wall lifts, one election settles it.">
 </p>
 
-# nemea
+# moirae
 
 You just watched five Raft nodes lose their network for two seconds. The two on the wrong side of
 the wall tried twelve times to elect a leader and never could — every vote request died at the
@@ -16,15 +16,15 @@ TypeScript end of that idea — not a replacement for it.
 That run is not a recording of luck. It is seed 19, and it replays byte for byte on your machine:
 
 ```
-npx nemea demo
+npx moirae demo
 ```
 
-runs it, prints what happened, writes `nemea-demo.jsonl`, and opens it in the studio. Any trace
-opens the same way: `npx nemea replay some-trace.jsonl`.
+runs it, prints what happened, writes `moirae-demo.jsonl`, and opens it in the studio. Any trace
+opens the same way: `npx moirae replay some-trace.jsonl`.
 
 ## What it is
 
-nemea is deterministic simulation testing for distributed systems, in TypeScript. You write a
+moirae is deterministic simulation testing for distributed systems, in TypeScript. You write a
 protocol against a small interface, run it under a deterministic scheduler with injected faults —
 latency, loss, duplication, partitions, crashes — and when an invariant breaks you get a seed that
 reproduces the failure exactly, and a trace you can scrub through.
@@ -40,7 +40,7 @@ against its naive form, including the Figure 8 sequence.
 // typechecked and linted under the same rules as the shipped protocols, and
 // CI asserts that the README's copy is identical to it.
 
-import { simulate, type Ctx, type Process, type SimulationResult } from '@nemea/core';
+import { simulate, type Ctx, type Process, type SimulationResult } from '@moirae/core';
 
 interface State {
   count: number;
@@ -86,7 +86,7 @@ export function run(): SimulationResult {
 }
 
 // run().violation is null, or { invariant, detail, step, time } — and the seed
-// above reproduces it. run().jsonl is the trace: `npx nemea replay` opens it.
+// above reproduces it. run().jsonl is the trace: `npx moirae replay` opens it.
 ```
 
 A process sees the world only through `ctx`. There is no other way to get the time, a random
@@ -97,19 +97,19 @@ number, or a timer, and a lint rule keeps it that way.
 Three pieces, and a file between them.
 
 ```
-   you write                  nemea runs                                 you look
+   you write                  moirae runs                                 you look
 +------------------+     +------------------------------------+     +--------------------+
-|  Process         | --> |  engine  (@nemea/core)             | --> |  trace.jsonl       | --> studio:
+|  Process         | --> |  engine  (@moirae/core)             | --> |  trace.jsonl       | --> studio:
 |    init          |     |    clock, (time, seq) event queue, |     |    one event per   |     scrub it,
 |    onMessage     |     |    PRNG, network model, faults,    |     |    line; versioned |     or write
 |    onTimer       |     |    invariants                      |     |    the contract    |     your own
 +------------------+     +------------------------------------+     +--------------------+
 ```
 
-- **Engine** — [`packages/core`](packages/core), published as `@nemea/core`: the clock, the
+- **Engine** — [`packages/core`](packages/core), published as `@moirae/core`: the clock, the
   `(time, seq)` event queue, the PRNG, the network model, fault injection and invariant checking.
   Zero dependencies.
-- **Protocols** — [`packages/protocols`](packages/protocols), `@nemea/protocols`: `Process`
+- **Protocols** — [`packages/protocols`](packages/protocols), `@moirae/protocols`: `Process`
   implementations. Raft today, transcribed from the paper ([`docs/RAFT.md`](docs/RAFT.md)).
   [`examples`](examples) holds the fixed scenarios, with their trace hashes pinned in CI, and the
   sample above.

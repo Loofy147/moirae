@@ -11,7 +11,7 @@ const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', impo
 };
 
 export default defineConfig({
-  define: { __NEMEA_VERSION__: JSON.stringify(pkg.version) },
+  define: { __MOIRAE_VERSION__: JSON.stringify(pkg.version) },
   build: {
     ssr: 'src/cli.ts',
     outDir: 'dist',

@@ -1,6 +1,6 @@
-# @nemea/core
+# @moirae/core
 
-The [nemea](https://github.com/pchrysostomou/nemea) engine: deterministic simulation testing for
+The [moirae](https://github.com/pchrysostomou/moirae) engine: deterministic simulation testing for
 distributed systems, in TypeScript, with zero dependencies. You write a protocol against a small
 interface; the engine runs it under a deterministic scheduler with injected faults — latency, loss,
 duplication, partitions, crashes — checks your invariants after every step, and writes a JSONL
@@ -39,7 +39,7 @@ number, or a timer.
 ## Run one
 
 ```ts
-import { simulate } from '@nemea/core';
+import { simulate } from '@moirae/core';
 
 const result = simulate<State>({
   seed: 0xc0ffee,
@@ -56,11 +56,11 @@ const result = simulate<State>({
 });
 
 result.violation; // null, or { invariant, detail, step, time }
-result.jsonl;     // the trace — `npx nemea replay` opens it
+result.jsonl;     // the trace — `npx moirae replay` opens it
 ```
 
 A sketch; the runnable, typechecked version is
-[`examples/src/ping.ts`](https://github.com/pchrysostomou/nemea/blob/main/examples/src/ping.ts).
+[`examples/src/ping.ts`](https://github.com/pchrysostomou/moirae/blob/main/examples/src/ping.ts).
 
 ## Determinism
 
@@ -68,5 +68,5 @@ Same seed, same trace, byte for byte — across runs, machines and Node versions
 hashes its example traces on Node 20, 22 and 24 on every push. When a run finds a violation, the
 seed is the whole bug report.
 
-The interfaces, precisely: [SPEC.md](https://github.com/pchrysostomou/nemea/blob/main/docs/SPEC.md).
-Repository: https://github.com/pchrysostomou/nemea. Apache-2.0.
+The interfaces, precisely: [SPEC.md](https://github.com/pchrysostomou/moirae/blob/main/docs/SPEC.md).
+Repository: https://github.com/pchrysostomou/moirae. Apache-2.0.

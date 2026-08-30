@@ -1,7 +1,7 @@
-// nemea — deterministic simulation testing for distributed systems.
+// moirae — deterministic simulation testing for distributed systems.
 //
-//   nemea demo               run the clean Raft scenario, show the trace in the studio
-//   nemea replay <trace>     open an existing trace in the studio
+//   moirae demo               run the clean Raft scenario, show the trace in the studio
+//   moirae replay <trace>     open an existing trace in the studio
 //
 // Everything a stranger needs on a machine that has never seen the repo:
 // this file is bundled with the engine, the Raft implementation, the example
@@ -10,26 +10,26 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clean } from '@nemea/examples';
+import { clean } from '@moirae/examples';
 import { serveStudio } from './serve';
 import { summarize } from './summary';
 
-const HELP = `nemea ${__NEMEA_VERSION__} — deterministic simulation testing for distributed systems
+const HELP = `moirae ${__MOIRAE_VERSION__} — deterministic simulation testing for distributed systems
 
 usage:
-  nemea demo [--out <file>] [--port <n>] [--no-open] [--no-serve]
+  moirae demo [--out <file>] [--port <n>] [--no-open] [--no-serve]
       Run five Raft nodes through a network partition and a crash, print what
       happened, write the trace, and open it in the studio.
-      --out <file>   where to write the trace (default: nemea-demo.jsonl)
+      --out <file>   where to write the trace (default: moirae-demo.jsonl)
       --port <n>     studio port (default: any free port)
       --no-open      do not open a browser
       --no-serve     print the summary and write the trace, then exit
 
-  nemea replay <trace.jsonl> [--port <n>] [--no-open]
+  moirae replay <trace.jsonl> [--port <n>] [--no-open]
       Open a trace in the studio. A trace replays byte for byte on any machine.
 
-  nemea --version
-  nemea --help
+  moirae --version
+  moirae --help
 `;
 
 interface Flags {
@@ -76,7 +76,7 @@ async function serve(trace: string, flags: Flags): Promise<void> {
 
 async function demo(flags: Flags): Promise<void> {
   const result = clean.run();
-  const out = resolve(process.cwd(), flags.out ?? 'nemea-demo.jsonl');
+  const out = resolve(process.cwd(), flags.out ?? 'moirae-demo.jsonl');
   writeFileSync(out, result.jsonl);
   console.log(summarize(result.jsonl));
   console.log('');
@@ -95,7 +95,7 @@ async function replay(flags: Flags): Promise<void> {
   if (!existsSync(path)) throw new Error(`no such file: ${path}`);
   const trace = readFileSync(path, 'utf8');
   const first = trace.split('\n')[0] ?? '';
-  if (!first.includes('"kind":"header"')) throw new Error(`${file} does not look like a nemea trace (no header line)`);
+  if (!first.includes('"kind":"header"')) throw new Error(`${file} does not look like a moirae trace (no header line)`);
   console.log(summarize(trace));
   console.log('');
   await serve(trace, flags);
@@ -107,7 +107,7 @@ async function main(argv: readonly string[]): Promise<void> {
     return;
   }
   if (argv.includes('--version') || argv.includes('-v')) {
-    console.log(__NEMEA_VERSION__);
+    console.log(__MOIRAE_VERSION__);
     return;
   }
   const flags = parse(argv);
@@ -124,6 +124,6 @@ async function main(argv: readonly string[]): Promise<void> {
 }
 
 main(process.argv.slice(2)).catch((err: unknown) => {
-  console.error(`nemea: ${err instanceof Error ? err.message : String(err)}`);
+  console.error(`moirae: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });

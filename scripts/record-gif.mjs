@@ -3,7 +3,7 @@
 // layout at fixed simulated times, and ffmpeg assembles the frames.
 //
 //   pnpm examples                              # writes out/clean-partition.jsonl
-//   pnpm --filter nemea build                  # dist/cli.js + dist/studio
+//   pnpm --filter moirae build                  # dist/cli.js + dist/studio
 //   node scripts/record-gif.mjs [--browser <path to msedge/chrome>]
 //
 // The sequence (docs: Phase 6 recording plan), 12 fps:
@@ -41,7 +41,7 @@ const FPS = 12;
 const trace = join(root, 'out', 'clean-partition.jsonl');
 const cli = join(root, 'packages', 'cli', 'dist', 'cli.js');
 const frames = join(root, 'out', 'gif-frames');
-const gif = join(root, 'docs', 'nemea-demo.gif');
+const gif = join(root, 'docs', 'moirae-demo.gif');
 for (const f of [trace, cli]) if (!existsSync(f)) throw new Error(`missing ${f} — see the header of this script`);
 
 // The frame schedule: [simulated time, real seconds].
