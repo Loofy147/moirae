@@ -91,9 +91,10 @@ export function App() {
     if (file !== undefined) loadFile(file);
   };
 
+  const isBare = bare();
   return (
-    <main className="studio" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-      <header className="studio-header">
+    <main className={isBare ? 'studio studio-bare' : 'studio'} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+      <header className="studio-header" hidden={isBare && status.kind === 'ready'}>
         <div className="studio-title">
           <h1>moira studio</h1>
           <label className="file-button">
@@ -148,9 +149,16 @@ function initialPlayhead(duration: number): number {
   return Number.isFinite(t) ? t : duration;
 }
 
+// ?chrome=0 shows the legend and the timeline alone — for recordings and
+// embeds; the playhead still comes from ?t=.
+function bare(): boolean {
+  return new URLSearchParams(window.location.search).get('chrome') === '0';
+}
+
 function Viewer({ model }: { model: TraceModel }) {
   const playback = usePlayback(model.duration, initialPlayhead(model.duration));
   const [selected, setSelected] = useState<number | null>(null);
+  const isBare = bare();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -165,6 +173,14 @@ function Viewer({ model }: { model: TraceModel }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [playback]);
 
+  if (isBare) {
+    return (
+      <div className="bare">
+        <Legend model={model} />
+        <Timeline model={model} playhead={playback.t} selected={null} bare onSeek={playback.seek} onSelect={() => undefined} />
+      </div>
+    );
+  }
   return (
     <>
       <Legend model={model} />

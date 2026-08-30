@@ -31,7 +31,16 @@ export function Legend({ model }: { model: TraceModel }) {
       <div className="legend-row">
         <span className="legend-title">arcs</span>
         {model.messageTypes.map((type) => (
-          <span key={type} className={isElectionTraffic(type) ? 'legend-item' : 'legend-item legend-item-quiet'}>
+          <span
+            key={type}
+            className={[
+              'legend-item',
+              isElectionTraffic(type) ? '' : 'legend-item-quiet',
+              type.endsWith('Response') ? 'legend-item-reply' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <span className="legend-line" style={{ borderColor: arcColourFor(type) }} /> {messageLabel(type)}
           </span>
         ))}

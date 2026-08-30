@@ -17,9 +17,14 @@ export interface Scale {
   readonly plotRight: number;
 }
 
-export function makeScale(duration: number, nodeCount: number): Scale {
-  const plotLeft = GUTTER;
-  const plotRight = WIDTH - RIGHT;
+// The bare (recording) layout: a narrower frame drawn 1:1 with larger type,
+// so the picture survives GitHub's ~800px README column and a phone.
+export const BARE_WIDTH = 1000;
+export const BARE_GUTTER = 84;
+
+export function makeScale(duration: number, nodeCount: number, width = WIDTH, gutter = GUTTER): Scale {
+  const plotLeft = gutter;
+  const plotRight = width - RIGHT;
   const span = Math.max(duration, 1);
   return {
     x: (t) => plotLeft + (t / span) * (plotRight - plotLeft),
