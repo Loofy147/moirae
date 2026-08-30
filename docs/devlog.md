@@ -8,7 +8,7 @@ nothing.
 
 moirae is a deterministic simulation testing framework for distributed systems, in TypeScript,
 with a viewer that replays a trace. Seven phases — the repository's own numbering skipped 4, and
-this document says why — fifteen pull requests, two renames, one lost scope. Everything below
+this document says why — two renames, one lost scope. Everything below
 happened; where I reported something I had not verified, that is in here too.
 
 ## Phase 0: the one rule, and the rule that guards it
@@ -340,9 +340,9 @@ rule without its incident reads as a preference and gets argued with.
 
 ## What the record shows
 
-Fifteen pull requests, every commit in each of them passing typecheck, lint and the full test
-suite on its own before it was pushed, merged without squashing so bisect and single-commit revert
-work anywhere in the history. Two pinned trace hashes that have not moved except when a change to the
+Every commit in every pull request passing typecheck, lint and the full test suite on its own
+before it was pushed — one exception, recorded above — merged without squashing so bisect and
+single-commit revert work anywhere in the history. Two pinned trace hashes that have not moved except when a change to the
 engine was made on purpose and said so. Ten Raft rules each with a test that was made to fail
 before it was allowed to pass. A fixture that told the wrong story until a test asked it to prove
 the right one. Two renames and one lost scope, all three recorded with the reason. And one tool
