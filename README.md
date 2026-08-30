@@ -9,6 +9,10 @@ the wall tried twelve times to elect a leader and never could — every vote req
 wall. The three on the right side kept theirs. When the wall came down, one election settled it,
 and a node that crashed came back with its log intact.
 
+This is v0: one protocol (Raft), no trace shrinking, no Byzantine faults, no membership changes,
+no pre-vote, nothing hosted. If you arrived expecting Antithesis, this is the small, readable,
+TypeScript end of that idea — not a replacement for it.
+
 That run is not a recording of luck. It is seed 19, and it replays byte for byte on your machine:
 
 ```
@@ -88,18 +92,42 @@ export function run(): SimulationResult {
 A process sees the world only through `ctx`. There is no other way to get the time, a random
 number, or a timer, and a lint rule keeps it that way.
 
+## Architecture
+
+Three pieces, and a file between them.
+
+```
+   you write                  nemea runs                                 you look
++------------------+     +------------------------------------+     +--------------------+
+|  Process         | --> |  engine  (@nemea/core)             | --> |  trace.jsonl       | --> studio:
+|    init          |     |    clock, (time, seq) event queue, |     |    one event per   |     scrub it,
+|    onMessage     |     |    PRNG, network model, faults,    |     |    line; versioned |     or write
+|    onTimer       |     |    invariants                      |     |    the contract    |     your own
++------------------+     +------------------------------------+     +--------------------+
+```
+
+- **Engine** — [`packages/core`](packages/core), published as `@nemea/core`: the clock, the
+  `(time, seq)` event queue, the PRNG, the network model, fault injection and invariant checking.
+  Zero dependencies.
+- **Protocols** — [`packages/protocols`](packages/protocols), `@nemea/protocols`: `Process`
+  implementations. Raft today, transcribed from the paper ([`docs/RAFT.md`](docs/RAFT.md)).
+  [`examples`](examples) holds the fixed scenarios, with their trace hashes pinned in CI, and the
+  sample above.
+- **Studio** — [`apps/studio`](apps/studio): a pure function of a trace file. It imports one type
+  from the engine and nothing else.
+
+The data flow is `simulate()` → `trace.jsonl` → studio, and **the trace file is the contract**:
+versioned JSONL, one self-describing event per line. Anyone can write another viewer against it,
+or replace the engine behind it, without touching the other side.
+
+- The interfaces, precisely: [`docs/SPEC.md`](docs/SPEC.md).
+- Why TypeScript, and why the engine has zero dependencies: [`docs/DECISIONS.md`](docs/DECISIONS.md)
+  (ADR-001 and ADR-004).
+
 ## Determinism, enforced
 
 Same seed, same trace, byte for byte — across runs, machines and Node versions. CI hashes the
 example traces on Node 20, 22 and 24 on every push; an engine change that alters a single byte
 fails the build. When a fuzz run finds a violation, the seed is the whole bug report.
 
-## What's here
-
-- [`packages/core`](packages/core) — the engine: clock, event queue, PRNG, network model, faults, invariants, trace.
-- [`packages/protocols`](packages/protocols) — Raft, transcribed from the paper; see [`docs/RAFT.md`](docs/RAFT.md).
-- [`apps/studio`](apps/studio) — the replay viewer, a pure function of the trace file.
-- [`examples`](examples) — the two fixed scenarios, with their trace hashes pinned in CI.
-- [`docs/SPEC.md`](docs/SPEC.md) — what v0 is, precisely. [`docs/DECISIONS.md`](docs/DECISIONS.md) — why.
-
-v0. Apache-2.0.
+Apache-2.0.
