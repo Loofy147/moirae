@@ -294,6 +294,14 @@ export function simulate<S extends Record<string, unknown>>(
       },
       now: () => now,
       random: () => rt.prng.random(),
+      // Exactly one draw, mapped the way protocol authors were doing by hand,
+      // so switching to randomInt never changes a trace.
+      randomInt: (min, max) => {
+        if (!Number.isInteger(min) || !Number.isInteger(max) || min > max) {
+          throw new Error(`node ${id} called randomInt(${min}, ${max}): need integers with min <= max`);
+        }
+        return min + Math.floor(rt.prng.random() * (max - min + 1));
+      },
       send: (to, msg) => {
         send(rt, to, msg);
       },

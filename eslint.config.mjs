@@ -104,6 +104,9 @@ export default tseslint.config(
     files: [
       'packages/core/**/*.{ts,tsx,mts,cts}',
       'packages/protocols/**/*.{ts,tsx,mts,cts}',
+      // Example protocols are read as protocols: same rules. (examples/test
+      // writes trace files and is deliberately outside.)
+      'examples/src/**/*.{ts,tsx,mts,cts}',
     ],
     linterOptions: {
       noInlineConfig: true,

@@ -50,6 +50,7 @@ interface Ctx<S> {
 
   now(): SimTime;                 // logical clock, never wall clock
   random(): number;               // [0,1), from the per-node seeded PRNG
+  randomInt(min: number, max: number): number;   // integer in [min, max]; exactly one draw of random()
 
   send(to: NodeId, msg: Message): void;
   broadcast(msg: Message): void;
