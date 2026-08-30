@@ -9,5 +9,8 @@
   "dependencies": {
     "@moira/core": "workspace:*",
     "@moira/protocols": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts"
   }
 }

@@ -232,7 +232,33 @@ Vite + React. Loads a `.jsonl` trace via file picker or URL. Renders:
 - a scrubber; the state panel shows each node's folded state at the playhead
 - clicking a message highlights its send and deliver events
 
-The studio imports the trace schema type and nothing else from the engine (ADR-003).
+The studio imports the trace schema type and nothing else from the engine (ADR-003); a lint rule
+in `eslint.config.mjs` makes that mechanical. It runs no simulation. A trace reaches it as a
+dropped or picked file, as `?trace=URL`, or as a string in `window.__MOIRA_TRACE__` for
+single-file exports; `?t=ms` sets the playhead. In development the server serves the repo's
+`out/` directory, where `pnpm examples` writes the example traces.
+
+**Display conventions.** The studio is protocol-agnostic and knows nothing about Raft; the trace
+gives it only generic `state` patches. So two conventions do the work of colouring the picture:
+
+- A top-level state field named `role` (a string) colours the node's lane. Fixed palette:
+  `leader` blue, `candidate` amber, `follower` grey; any other value gets a neutral colour and
+  its raw name. A field named `currentTerm` (or `term`, a number) labels each stretch of a lane.
+- If a trace has no `role` field, the studio says so in the legend — *"this trace has no
+  top-level `role` field, so lanes aren't coloured by state; see SPEC §9"* — rather than showing
+  grey lanes and letting the viewer conclude the tool is broken. Likewise for a missing term.
+
+Reason: protocol authors name their state as they like, and the studio must not import a
+protocol to find out what the names mean; a naming convention costs an author nothing and keeps
+the viewer a pure function of the file. **Upgrade path**, should a contributed protocol
+genuinely not be able to satisfy the naming: a protocol-emitted role-change trace event (a new
+`kind`), which is a trace-format change and needs a format version bump.
+
+Message types get plain-language legend labels from a small lookup table in
+`apps/studio/src/trace/labels.ts` (`RequestVote` → "asking for votes"), falling back to the raw
+`msg.type`. It is data, not logic. Vote traffic is drawn loud and everything else quiet, so an
+election reads at a glance; a dropped message stops short — at the partition wall when the wall
+is what stopped it.
 
 ## 10. Acceptance criteria for v0
 
