@@ -21,7 +21,7 @@ export class TraceParseError extends Error {
 
 export function parseJsonl(text: string): ParsedTrace {
   const lines = text.split('\n');
-  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  if (lines.at(-1) === '') lines.pop();
   if (lines.length === 0) throw new TraceParseError(1, 'empty file');
 
   const parseLine = (i: number): Record<string, unknown> => {

@@ -22,6 +22,17 @@ type Status =
   | { kind: 'error'; source: string; message: string }
   | { kind: 'ready'; source: string; model: TraceModel };
 
+// ?trace= is user input: accept only http(s) URLs or paths resolved against
+// this page, never other schemes.
+function traceUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw, window.location.href);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function explain(err: unknown): string {
   if (err instanceof TraceParseError) {
     return `${err.message}. This does not look like a moira v1 trace — expected JSONL with a header line first (SPEC §5).`;
@@ -57,8 +68,13 @@ export function App() {
       load('embedded trace', embedded);
       return;
     }
-    const url = new URLSearchParams(window.location.search).get('trace');
-    if (url === null) return;
+    const raw = new URLSearchParams(window.location.search).get('trace');
+    if (raw === null) return;
+    const url = traceUrl(raw);
+    if (url === null) {
+      setStatus({ kind: 'error', source: raw, message: 'only http(s) URLs or paths on this site can be loaded' });
+      return;
+    }
     setStatus({ kind: 'loading', source: url });
     fetch(url)
       .then(async (res) => {

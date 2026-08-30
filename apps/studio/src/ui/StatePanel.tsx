@@ -20,11 +20,9 @@ function headline(state: Readonly<Record<string, unknown>>, conventions: TraceMo
 function describe(value: unknown): string {
   if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? 'entry' : 'entries'}`;
   if (value === null) return 'none';
-  if (typeof value === 'object') {
-    const json = JSON.stringify(value);
-    return json.length > 40 ? `${json.slice(0, 37)}…` : json;
-  }
-  return String(value);
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  const json = JSON.stringify(value) ?? 'undefined';
+  return json.length > 40 ? `${json.slice(0, 37)}…` : json;
 }
 
 export function StatePanel({ model, t }: { model: TraceModel; t: number }) {

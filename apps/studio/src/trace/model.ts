@@ -188,7 +188,7 @@ export function deriveModel(parsed: ParsedTrace): TraceModel {
       } else if (step.kind === 'restart') {
         state = null; // the restart's full patch follows at the same t
       } else if (step.patch !== undefined) {
-        const next: Record<string, unknown> = { ...(state ?? {}) };
+        const next: Record<string, unknown> = state === null ? {} : { ...state };
         for (const [key, value] of Object.entries(step.patch)) {
           if (value === null) delete next[key];
           else next[key] = value;

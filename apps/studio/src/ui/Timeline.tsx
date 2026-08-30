@@ -108,13 +108,13 @@ function Lanes({ model, scale }: { model: TraceModel; scale: Scale }) {
             <text x={12} y={scale.laneMid(node) + 5} className="lane-label">
               node {node}
             </text>
-            {intervals.map((iv, i) => {
+            {intervals.map((iv) => {
               const showTerm = iv.term !== null && iv.term !== lastTerm;
               lastTerm = iv.term;
               const x0 = scale.x(iv.start);
               const w = Math.max(scale.x(iv.end) - x0, 1);
               return (
-                <g key={i}>
+                <g key={iv.start}>
                   <rect
                     x={x0}
                     y={top + LANE_PAD}
@@ -146,7 +146,7 @@ function Lanes({ model, scale }: { model: TraceModel; scale: Scale }) {
 function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
   return (
     <g>
-      {model.partitions.map((w, i) => {
+      {model.partitions.map((w) => {
         const x0 = scale.x(w.start);
         const x1 = scale.x(w.end);
         const walls: number[] = [];
@@ -158,7 +158,7 @@ function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
         const smaller = [...w.groups].sort((g1, g2) => g1.length - g2.length)[0] ?? [];
         const rest = w.groups.filter((g) => g !== smaller).flat();
         return (
-          <g key={i}>
+          <g key={w.start}>
             <rect
               x={x0}
               y={scale.laneTop(1)}
@@ -167,13 +167,13 @@ function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
               fill="#c0392b"
               opacity={0.07}
             />
-            {walls.map((y, j) => (
-              <line key={j} x1={x0} y1={y} x2={x1} y2={y} stroke="#c0392b" strokeWidth={4} strokeDasharray="10 6" />
+            {walls.map((y) => (
+              <line key={y} x1={x0} y1={y} x2={x1} y2={y} stroke="#c0392b" strokeWidth={4} strokeDasharray="10 6" />
             ))}
             <text x={x0 + 6} y={scale.laneTop(1) - 8} className="caption caption-partition">
               Partition — {listNodes(smaller)} cut off from {listNodes(rest)} ({formatTime(w.start)}–{formatTime(w.end)})
             </text>
-            {w.groups.map((group, g) => {
+            {w.groups.map((group) => {
               const story = groupStory(model, w, group);
               if (story === null) return null;
               // Inside the group's own lanes, on the seam between its first two
@@ -181,7 +181,7 @@ function Partitions({ model, scale }: { model: TraceModel; scale: Scale }) {
               const first = group[0] as number;
               const y = group.length > 1 ? scale.laneTop(first) + LANE + 4 : scale.laneMid(first) + 4;
               return (
-                <text key={g} x={x0 + 8} y={y} className="caption caption-story">
+                <text key={group.join("-")} x={x0 + 8} y={y} className="caption caption-story">
                   {story}
                 </text>
               );
@@ -225,13 +225,14 @@ function Arcs({
           const wall = wallBetween(model, m.send.t, m.send.from, m.send.to, scale);
           const xEnd = scale.x(m.drop.t) + 10;
           const yEnd = wall ?? y0 + (y1 - y0) * 0.35;
+          const style = dropStyle(isSelected, election);
           return (
             <g
               key={m.send.msgId}
               className="arc"
-              stroke={isSelected ? '#1d1d1b' : '#c0392b'}
-              strokeWidth={isSelected ? 3 : election ? 1.6 : 0.8}
-              opacity={isSelected ? 1 : election ? 0.95 : 0.18}
+              stroke={style.stroke}
+              strokeWidth={style.width}
+              opacity={style.opacity}
               onClick={pick}
             >
               <path d={`M ${x0} ${y0} L ${xEnd} ${yEnd}`} />
@@ -241,17 +242,18 @@ function Arcs({
             </g>
           );
         }
-        return m.delivers.map((d, k) => {
+        return m.delivers.map((d) => {
           const x1 = scale.x(d.t);
           const dx = Math.max((x1 - x0) / 2, 6);
+          const style = arcStyle(isSelected, election, d.dup === true, colour);
           return (
-            <g key={`${m.send.msgId}-${k}`} className="arc" onClick={pick}>
+            <g key={`${m.send.msgId}-${d.seq}`} className="arc" onClick={pick}>
               <path
                 d={`M ${x0} ${y0} C ${x0 + dx} ${y0} ${x1 - dx} ${y1} ${x1} ${y1}`}
-                stroke={isSelected ? '#1d1d1b' : colour}
-                strokeWidth={isSelected ? 3 : election ? (d.dup ? 2 : 1.4) : 0.7}
+                stroke={style.stroke}
+                strokeWidth={style.width}
                 strokeDasharray={d.dup ? '3 3' : undefined}
-                opacity={isSelected ? 1 : election ? 0.8 : 0.1}
+                opacity={style.opacity}
               />
               {isSelected && (
                 <>
@@ -289,30 +291,40 @@ export function groupStory(model: TraceModel, w: PartitionWindow, group: readonl
   return `${who} elected a leader (${attempts} ${attempts === 1 ? 'attempt' : 'attempts'})`;
 }
 
+// The y of the first group boundary an arc from lane a to lane b crosses,
+// walking from the sender, if a partition is active at t and separates them.
 function wallBetween(model: TraceModel, t: number, a: number, b: number, scale: Scale): number | null {
   const w = model.partitions.find((p) => t >= p.start && t < p.end);
   if (w === undefined || groupOf(w, a) === groupOf(w, b)) return null;
-  const lo = Math.min(a, b);
-  const hi = Math.max(a, b);
-  // The first group boundary strictly between the two lanes, seen from the sender.
-  const from = a < b ? lo : hi;
-  for (let n = lo; n < hi; n++) {
-    if (groupOf(w, n) !== groupOf(w, n + 1)) {
-      return from === lo || n + 1 === hi ? scale.laneTop(n + 1) : scale.laneTop(n + 1);
-    }
+  const step = a < b ? 1 : -1;
+  for (let n = a; n !== b; n += step) {
+    const next = n + step;
+    if (groupOf(w, n) !== groupOf(w, next)) return scale.laneTop(Math.max(n, next));
   }
   return null;
+}
+
+function dropStyle(selected: boolean, election: boolean): { stroke: string; width: number; opacity: number } {
+  if (selected) return { stroke: '#1d1d1b', width: 3, opacity: 1 };
+  if (election) return { stroke: '#c0392b', width: 1.6, opacity: 0.95 };
+  return { stroke: '#c0392b', width: 0.8, opacity: 0.18 };
+}
+
+function arcStyle(selected: boolean, election: boolean, dup: boolean, colour: string): { stroke: string; width: number; opacity: number } {
+  if (selected) return { stroke: '#1d1d1b', width: 3, opacity: 1 };
+  if (election) return { stroke: colour, width: dup ? 2 : 1.4, opacity: 0.8 };
+  return { stroke: colour, width: 0.7, opacity: 0.1 };
 }
 
 function Crashes({ model, scale }: { model: TraceModel; scale: Scale }) {
   return (
     <g>
-      {model.crashes.map((c, i) => {
+      {model.crashes.map((c) => {
         const x0 = scale.x(c.start);
         const x1 = scale.x(c.end);
         const top = scale.laneTop(c.node);
         return (
-          <g key={i}>
+          <g key={`${c.node}-${c.start}`}>
             <rect x={x0} y={top + 2} width={Math.max(x1 - x0, 2)} height={LANE - 4} fill="url(#hatch)" opacity={0.95} />
             <text x={x0 + 4} y={top + LANE / 2 + 4} className="caption caption-crash">
               crashed{c.restarted ? '' : ' (never restarted)'}
