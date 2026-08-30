@@ -55,4 +55,4 @@ declare const process: {
 };
 
 // Injected by the build (vite define) from package.json.
-declare const __NEMEA_VERSION__: string;
+declare const __MOIRAE_VERSION__: string;

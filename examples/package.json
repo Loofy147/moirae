@@ -1,5 +1,5 @@
 {
-  "name": "@nemea/examples",
+  "name": "@moirae/examples",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,8 +7,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@nemea/core": "workspace:*",
-    "@nemea/protocols": "workspace:*"
+    "@moirae/core": "workspace:*",
+    "@moirae/protocols": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts"

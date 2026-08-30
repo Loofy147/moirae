@@ -1,16 +1,16 @@
 {
-  "name": "nemea",
+  "name": "moirae",
   "version": "0.1.0",
-  "description": "Deterministic simulation testing for distributed systems, with a visual trace replay. `nemea demo` runs a 5-node Raft cluster through a partition and shows you the failure.",
+  "description": "Deterministic simulation testing for distributed systems, with a visual trace replay. `moirae demo` runs a 5-node Raft cluster through a partition and shows you the failure.",
   "license": "Apache-2.0",
   "author": "Prodromos Chrysostomou",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pchrysostomou/nemea.git",
+    "url": "git+https://github.com/pchrysostomou/moirae.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/pchrysostomou/nemea#readme",
-  "bugs": "https://github.com/pchrysostomou/nemea/issues",
+  "homepage": "https://github.com/pchrysostomou/moirae#readme",
+  "bugs": "https://github.com/pchrysostomou/moirae/issues",
   "keywords": [
     "deterministic-simulation",
     "distributed-systems",
@@ -22,7 +22,7 @@
   ],
   "type": "module",
   "bin": {
-    "nemea": "./dist/cli.js"
+    "moirae": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -39,10 +39,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@nemea/core": "workspace:*",
-    "@nemea/examples": "workspace:*",
-    "@nemea/protocols": "workspace:*",
-    "@nemea/studio": "workspace:*",
+    "@moirae/core": "workspace:*",
+    "@moirae/examples": "workspace:*",
+    "@moirae/protocols": "workspace:*",
+    "@moirae/studio": "workspace:*",
     "vite": "^8.2.2"
   }
 }

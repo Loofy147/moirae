@@ -4,7 +4,7 @@ Instructions for Claude Code working in this repository. Read this first, every 
 
 ## What this project is
 
-**nemea** is a deterministic simulation testing (DST) framework for distributed systems, plus a
+**moirae** is a deterministic simulation testing (DST) framework for distributed systems, plus a
 visual replay UI. You write a protocol against a tiny interface, run it under a deterministic
 scheduler with injected faults, and when an invariant breaks you get a seed that reproduces the
 failure exactly and a timeline you can scrub through.

@@ -9,6 +9,6 @@ export default defineConfig({
     emptyOutDir: false,
     target: 'es2022',
     minify: false,
-    rollupOptions: { external: ['@nemea/core'] },
+    rollupOptions: { external: ['@moirae/core'] },
   },
 });

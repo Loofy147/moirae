@@ -2,7 +2,7 @@
 // typechecked and linted under the same rules as the shipped protocols, and
 // CI asserts that the README's copy is identical to it.
 
-import { simulate, type Ctx, type Process, type SimulationResult } from '@nemea/core';
+import { simulate, type Ctx, type Process, type SimulationResult } from '@moirae/core';
 
 interface State {
   count: number;
@@ -48,4 +48,4 @@ export function run(): SimulationResult {
 }
 
 // run().violation is null, or { invariant, detail, step, time } — and the seed
-// above reproduces it. run().jsonl is the trace: `npx nemea replay` opens it.
+// above reproduces it. run().jsonl is the trace: `npx moirae replay` opens it.

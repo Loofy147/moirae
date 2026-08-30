@@ -171,6 +171,45 @@ unrestricted. `apps/studio` is unrestricted.
 
 ---
 
+# ADR-007: The project is named moirae, not nemea
+
+**Status:** Accepted
+**Date:** 2026-08-30
+**Supersedes:** ADR-006
+
+## Context
+
+ADR-006 renamed the project to `nemea` after `moira` turned out to be taken on npm. At first
+publish the registry refused `nemea` with 403: "Package name too similar to existing packages
+namaa, remeda". That similarity check runs at publish time, is not visible from `npm view` — a name
+can be unregistered and still refused — and has no appeal.
+
+Publishing under a scope (`npx @nemea/cli demo`) would have worked, but the clean command
+`npx <name> demo` is the first line of the README and the line that goes in every post about the
+project. That command being clean was worth more than the name.
+
+Candidates were tested the only reliable way: an attempted publish of a throwaway package per
+name, stopped by the account's 2FA before anything could land. Passed: `moirae`, `telos`, `parca`,
+`sortes`, `ourania`, `distaff`, `fateloom`, `simfate`. Everything else tried was already
+registered.
+
+## Decision
+
+The project, the CLI package and the npm scope are `moirae` / `@moirae/*` — the Fates, plural,
+which is the meaning the original name carried. The GitHub repository is renamed (the old name
+redirects). No document writes `npx nemea` or `npx moira`.
+
+ADR-006 stays as written: this is the second rename, and the record should show why both happened.
+ADR-001 to ADR-005 keep the original name in their text for the same reason.
+
+## Consequences
+
+- Easier: a first command that resolves, under a name that means what the project does.
+- Harder: a second mechanical rename, again in one commit; two prior names in the ADR history.
+- To revisit: never. A registry refusal was the last cheap moment; after publishing, a name is permanent.
+
+---
+
 # ADR-006: The project is named nemea, not moira
 
 **Status:** Accepted

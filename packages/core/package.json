@@ -1,5 +1,5 @@
 {
-  "name": "@nemea/core",
+  "name": "@moirae/core",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -10,15 +10,15 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "description": "The nemea engine: deterministic simulation testing for distributed systems. Clock, event queue, PRNG, network faults, invariants, JSONL trace. Zero dependencies.",
+  "description": "The moirae engine: deterministic simulation testing for distributed systems. Clock, event queue, PRNG, network faults, invariants, JSONL trace. Zero dependencies.",
   "license": "Apache-2.0",
   "author": "Prodromos Chrysostomou",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pchrysostomou/nemea.git",
+    "url": "git+https://github.com/pchrysostomou/moirae.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/pchrysostomou/nemea#readme",
+  "homepage": "https://github.com/pchrysostomou/moirae#readme",
   "keywords": [
     "deterministic-simulation",
     "distributed-systems",

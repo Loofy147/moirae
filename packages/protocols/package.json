@@ -1,5 +1,5 @@
 {
-  "name": "@nemea/protocols",
+  "name": "@moirae/protocols",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -8,20 +8,20 @@
     "prepack": "vite build && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@nemea/core": "workspace:^"
+    "@moirae/core": "workspace:^"
   },
   "exports": {
     ".": "./src/index.ts"
   },
-  "description": "Raft for the nemea simulator, transcribed from the paper, with its safety invariants.",
+  "description": "Raft for the moirae simulator, transcribed from the paper, with its safety invariants.",
   "license": "Apache-2.0",
   "author": "Prodromos Chrysostomou",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pchrysostomou/nemea.git",
+    "url": "git+https://github.com/pchrysostomou/moirae.git",
     "directory": "packages/protocols"
   },
-  "homepage": "https://github.com/pchrysostomou/nemea#readme",
+  "homepage": "https://github.com/pchrysostomou/moirae#readme",
   "keywords": [
     "deterministic-simulation",
     "distributed-systems",
