@@ -7,9 +7,9 @@ broke, and what each break taught — because a devlog that only contains the cl
 nothing.
 
 moirae is a deterministic simulation testing framework for distributed systems, in TypeScript,
-with a viewer that replays a trace. Six phases, thirteen pull requests, two renames, one open
-item at the end. Everything below happened; where I reported something I had not verified, that
-is in here too.
+with a viewer that replays a trace. Seven phases — the repository's own numbering skipped 4, and
+this document says why — fifteen pull requests, two renames, one lost scope. Everything below
+happened; where I reported something I had not verified, that is in here too.
 
 ## Phase 0: the one rule, and the rule that guards it
 
@@ -175,6 +175,41 @@ carries and what it does not: the ten pattern tests are the correctness argument
 what says the engine and the implementation survive contact with each other. A clean demo run
 proves neither, and the example scenario says so in its header.
 
+## Phase 4: the two fixtures, which the history never numbered
+
+Between Raft and the viewer there is a pull request the plan never called a phase: "examples:
+clean and harsh Raft scenarios with pinned trace hashes". It was a phase by every other measure, so
+it gets a number here; the repository's own history goes from Phase 3 to Phase 5 because at the
+time it was a request, not a plan.
+
+It started as a demo. Before building the viewer, the brief was: run the clean scenario so that a
+person can read what the engine and Raft actually did. That run — five nodes, one partition, one
+crash, a printed timeline of elections, drops by reason, and five identical logs at the end — was
+the first time the project produced something a stranger could look at, and it exposed the thing
+that would matter most in Phase 5: the timeline printed `term=2` at the end, and it was tempting
+to read two elections in six seconds as evidence about Raft. It is evidence that the scenario is
+gentle. The correctness argument lives in the pattern tests and the fuzz, and the example script's
+header now says so, so nobody mistakes a clean demo run for a proof.
+
+Then a harsher scenario: 5% duplication, two partitions with different splits, three crashes
+including one mid-partition on the majority side. Asking for it surfaced a limit of the engine
+rather than of Raft: two partitions cannot overlap in time, because the network model holds one
+active partition and rejects overlapping windows at validation. What it can express is two
+consecutive splits with no healed gap between them — the cluster going straight from
+`[1,2] | [3,4,5]` into `[1,2,3] | [4,5]`, flipping the majority — and that is what ran. It
+converged: five identical logs of forty-four entries, nine elections, fifty-seven duplicate
+deliveries, three hundred and forty-two messages dead at a wall. During the mid-partition crash the
+majority side was two of five and elected nobody until the crashed node came back, which is
+exactly right. Conflict-only truncation and the matchIndex echo had survived a realistic run, not
+only the scripted harness.
+
+Both scenarios were committed as scripts with their trace hashes pinned in CI, the traces
+themselves regenerated rather than stored, so that a future engine change that alters either trace
+by a byte fails the build instead of the GIF quietly becoming a lie. SonarCloud, newly wired into
+the repository, failed the pull request on its first run: 16.2% duplicated lines against a 3%
+gate, because I had copied the workload driver into the examples "to keep them self-contained". A
+metric caught a shortcut I had already rationalised. The driver got one home.
+
 ## Phase 5: the story that was not in the fixture
 
 The studio is the viewer: a pure function of a trace file, read-only, importing exactly one type
@@ -268,9 +303,9 @@ passing, and ADR-008 records the lesson in one sentence: if you want an unscoped
 matching scope, create the org first, then publish.
 
 One more consequence of the sequence: `moirae@0.1.0` on the registry was built from the
-scoped-name commit, so the CLI tarball on npm does not match what the `v0.1.0` tag contains. The
-libraries do. The CLI is republished as 0.1.1 from the tagged line so the registry and the tag
-agree.
+scoped-name commit, so the CLI tarball on npm did not match what the `v0.1.0` tag contains. The
+libraries did. The CLI was republished as 0.1.1 from the tagged line and tagged `v0.1.1`, so the
+registry and the tags agree: `moirae@0.1.1`, `moirae-core@0.1.0`, `moirae-protocols@0.1.0`.
 
 ## Things I got wrong in the telling
 
@@ -292,9 +327,9 @@ rule without its incident reads as a preference and gets argued with.
 
 ## What the record shows
 
-Thirteen pull requests, every commit in each of them passing typecheck, lint and the full test
-suite alone in a clean worktree, merged without squashing so bisect and single-commit revert work
-anywhere in the history. Two pinned trace hashes that have not moved except when a change to the
+Fifteen pull requests, every commit in each of them passing typecheck, lint and the full test
+suite on its own before it was pushed, merged without squashing so bisect and single-commit revert
+work anywhere in the history. Two pinned trace hashes that have not moved except when a change to the
 engine was made on purpose and said so. Ten Raft rules each with a test that was made to fail
 before it was allowed to pass. A fixture that told the wrong story until a test asked it to prove
 the right one. Two renames and one lost scope, all three recorded with the reason. And one tool
