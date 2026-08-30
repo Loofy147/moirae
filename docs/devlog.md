@@ -320,7 +320,20 @@ at it twice while building the tool.
 
 Smaller versions of the same thing: a working directory persisting between shell commands sent a
 commit gate into the wrong package, where it failed on a missing `lint` script — absolute paths in
-every chain now. And the `| grep` gate that let a red commit into history. None of these are
+every chain now. And the `| grep` gate that let a red commit into history.
+
+Then a third shell failure, of a shape `set -o pipefail` cannot catch. Preparing the contributing
+guide, a gate chain ran `grep -c PLACEHOLDER` to confirm a template marker was gone. `grep -c`
+exits 1 when the count is zero — a valid answer, not a pipe failure — and the `&&` chain stopped
+there, before the commit that added the document. The next chain committed only the identity test
+that asserts the document exists, and I wrote a description saying "two commits" without reading
+`git log`. That pull request, #19, was merged as it stood, and `main` was red at `b3a5727` — a test
+asserting a file that was not there — until #20 landed the missing file. A bisect across that
+interval will hit it. We chose not to rewrite published history: a red commit on `main` that is
+honestly labelled is worth more than a clean history that is not. Three shell gates have now failed
+silently in three different ways, and the rule that came out of the third is not about pipes: never
+claim a commit count you have not read from `git log origin/main..HEAD`, and never put a
+match-count check inside a gate chain. None of these are
 interesting engineering. They are the reason the project's instructions file has a section called
 "rules learned the hard way", and each rule there carries the incident that produced it, because a
 rule without its incident reads as a preference and gets argued with.
