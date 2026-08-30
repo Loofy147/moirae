@@ -75,6 +75,29 @@ docs/                  SPEC.md, DECISIONS.md, protocol write-ups
 5. If it changes a decision recorded in `docs/DECISIONS.md`, add a new ADR that supersedes the
    old one. Never edit an accepted ADR in place.
 
+## Rules learned the hard way
+
+**A negative assertion needs a positive sibling.** A test that asserts something did *not* happen
+must also assert that it had the opportunity to happen; otherwise it passes when the scenario is
+simply absent. This has cost us twice.
+
+- Phase 3, pattern #7: "replaying an old success response never moves `matchIndex` backwards"
+  passed trivially against the naive implementation, which set `matchIndex` from the log length
+  and never moved it at all. The test meant nothing until it was shown to fail against the
+  unguarded echo — the form a contributor would actually write.
+- Phase 5, the clean fixture: "the minority elected no leader inside the partition" passed while
+  the minority never even *tried* — the leader happened to be inside the minority and its
+  heartbeats kept the other node quiet. The fixture had already passed review. The sibling
+  assertion, "the minority attempted at least three elections", is what caught it.
+
+Write the positive sibling in the same test. If you cannot say what "had the opportunity" means
+for the thing being denied, the negative assertion is not testing anything.
+
+**Absolute paths in every shell chain.** Working directories persist between commands, and a `cd`
+in one chain silently changes the next. A commit gate once ran inside `apps/studio` and failed on
+a missing `lint` script. Start every chain with `cd /d/moira` (or the absolute path it needs) and
+refer to files by absolute path — in CI scripts, in verification loops, in one-off commands alike.
+
 ## Things that are deliberately out of scope right now
 
 Byzantine faults, trace shrinking/minimisation, other language bindings, a hosted playground,
