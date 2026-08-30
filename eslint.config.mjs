@@ -72,6 +72,35 @@ export default tseslint.config(
     extends: [tseslint.configs.recommended],
   },
   {
+    // ADR-003: the studio is a pure function of the trace file. It imports
+    // the trace schema type from the engine and nothing else — never engine
+    // code, never a protocol, never an example.
+    files: ['apps/studio/src/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@moira/core',
+              message:
+                'ADR-003: the studio imports only the trace schema type from the engine — use `import type`.',
+              allowTypeImports: true,
+            },
+            {
+              name: '@moira/protocols',
+              message: 'ADR-003: the studio is a pure function of the trace; it does not import protocols.',
+            },
+            {
+              name: '@moira/examples',
+              message: 'ADR-003: the studio does not run scenarios; it replays trace files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       'packages/core/**/*.{ts,tsx,mts,cts}',
       'packages/protocols/**/*.{ts,tsx,mts,cts}',
