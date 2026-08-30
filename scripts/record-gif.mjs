@@ -16,7 +16,7 @@
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,6 +25,17 @@ const browser =
   args[args.indexOf('--browser') + 1 || -1] ??
   ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/usr/bin/chromium'].find(existsSync);
 if (!browser) throw new Error('no headless browser found; pass --browser <path>');
+
+// Executables are called by absolute path, never looked up at call time.
+function onPath(name) {
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    for (const candidate of [join(dir, name), join(dir, `${name}.exe`)]) {
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  throw new Error(`${name} not found on PATH`);
+}
+const ffmpeg = args[args.indexOf('--ffmpeg') + 1 || -1] ?? onPath('ffmpeg');
 
 const FPS = 12;
 const trace = join(root, 'out', 'clean-partition.jsonl');
@@ -75,7 +86,7 @@ try {
     if (i % 12 === 0) console.log(`frame ${i + 1}/${plan.length} (t=${key} ms)`);
   });
   execFileSync(
-    'ffmpeg',
+    ffmpeg,
     ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', join(frames, 'f%04d.png'), '-vf', 'scale=1000:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3', '-loop', '0', gif],
     { stdio: 'inherit' },
   );
