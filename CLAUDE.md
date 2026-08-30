@@ -95,7 +95,7 @@ for the thing being denied, the negative assertion is not testing anything.
 
 **Absolute paths in every shell chain.** Working directories persist between commands, and a `cd`
 in one chain silently changes the next. A commit gate once ran inside `apps/studio` and failed on
-a missing `lint` script. Start every chain with `cd` to the repository root by absolute path (locally `d:moira`; the folder kept its old name) and
+a missing `lint` script. Start every chain with `cd` to the repository root by absolute path (locally `d:/moira`; the folder kept its old name) and
 refer to files by absolute path — in CI scripts, in verification loops, in one-off commands alike.
 
 ## Things that are deliberately out of scope right now
