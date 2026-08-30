@@ -1,4 +1,4 @@
-# moira — SPEC (v0)
+# nemea — SPEC (v0)
 
 Status: draft. This document defines what v0 is and, more importantly, what it is not.
 
@@ -29,7 +29,7 @@ and, when it fails, get this:
 ✗ invariant violated: atMostOneLeaderPerTerm
   at simTime=13480, step=8842
   nodes 2 and 4 both leader in term 7
-  replay: moira replay --seed 0xC0FFEE --trace out/0xC0FFEE.jsonl
+  replay: nemea replay --seed 0xC0FFEE --trace out/0xC0FFEE.jsonl
 ```
 
 ## 2. Non-goals for v0
@@ -135,7 +135,7 @@ Rules: `state` events carry patches, not full snapshots — the viewer reconstru
 A patch holds the changed top-level state fields; a field deleted from the state appears as
 `null`. `ctx.log(event, data?)` emits `log` events. Node ids are 1-based (`1..nodes`). `msgId`
 is assigned at send and is how send/deliver/drop are correlated. The header line records the
-trace format version, seed, node count, network config and moira version so a trace is
+trace format version, seed, node count, network config and nemea version so a trace is
 self-describing.
 
 Every line is readable without the source that produced it (ADR-003). `drop.reason` is `loss`
@@ -217,7 +217,7 @@ v0 ships, in `packages/protocols`, the Figure 3 checkers `electionSafety`, `logM
 
 ## 8. Fuzzing
 
-`moira fuzz --seeds 10000 --protocol raft` runs the same scenario across N seeds, in parallel
+`nemea fuzz --seeds 10000 --protocol raft` runs the same scenario across N seeds, in parallel
 worker threads (the engine is single-threaded per run, so this parallelises trivially), and
 reports every violating seed with the step at which it broke. Each failure prints a one-line
 replay command. Shrinking is v1.
@@ -234,7 +234,7 @@ Vite + React. Loads a `.jsonl` trace via file picker or URL. Renders:
 
 The studio imports the trace schema type and nothing else from the engine (ADR-003); a lint rule
 in `eslint.config.mjs` makes that mechanical. It runs no simulation. A trace reaches it as a
-dropped or picked file, as `?trace=URL`, or as a string in `window.__MOIRA_TRACE__` for
+dropped or picked file, as `?trace=URL`, or as a string in `window.__NEMEA_TRACE__` for
 single-file exports; `?t=ms` sets the playhead. In development the server serves the repo's
 `out/` directory, where `pnpm examples` writes the example traces.
 

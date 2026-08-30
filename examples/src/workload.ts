@@ -5,8 +5,8 @@
 // budget left, appends one command. The budget lives on the process instance:
 // a test driver's counter, deterministic, invisible to the protocol.
 
-import type { Ctx } from '@moira/core';
-import { Raft, type RaftState } from '@moira/protocols';
+import type { Ctx } from '@nemea/core';
+import { Raft, type RaftState } from '@nemea/protocols';
 
 export const PROPOSE_TIMER = 'propose';
 export const PROPOSE_INTERVAL = 40;

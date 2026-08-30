@@ -171,6 +171,43 @@ unrestricted. `apps/studio` is unrestricted.
 
 ---
 
+# ADR-006: The project is named nemea, not moira
+
+**Status:** Accepted
+**Date:** 2026-08-30
+
+## Context
+
+The project was called moira — fate — because a deterministic simulator is a fate machine, and
+the name did work. At launch preparation `moira` turned out to be taken on npm by an unrelated
+package published nine years earlier. `npx moira demo`, the first line of the README, could never
+have resolved to this project.
+
+Names that kept the meaning were checked in order of preference: `ananke` (necessity), `atropos`
+(the Fate who cannot be turned), `lachesis` (the Fate who measures out). All three are taken on
+npm. The fallback rule set beforehand: the shortest candidate nobody will misspell.
+
+## Decision
+
+The project, the CLI package and the npm scope are `nemea` / `@nemea/*`. The GitHub repository is
+renamed (the old name redirects). No document anywhere writes `npx moira`, because that resolves to
+someone else's package.
+
+ADR-001 to ADR-005 keep the old name in their text: they are records of decisions as made, and an
+accepted ADR is never edited.
+
+The `@nemea` npm scope could not be confirmed free before publishing (npm does not expose scope
+ownership to unauthenticated clients); it is verified at first publish, and if it is taken the
+libraries publish unscoped as `nemea-core` and `nemea-protocols`.
+
+## Consequences
+
+- Easier: a name that resolves, and a README whose first command works.
+- Harder: a rename after eight merged PRs — a mechanical find-and-replace, done in one commit.
+- To revisit: never; after launch a name is permanent.
+
+---
+
 # ADR-005: v0 ships one protocol, not a protocol library
 
 **Status:** Accepted

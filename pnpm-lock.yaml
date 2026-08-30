@@ -30,10 +30,10 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
-      '@moira/core':
+      '@nemea/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@moira/examples':
+      '@nemea/examples':
         specifier: workspace:*
         version: link:../../examples
       '@types/react':
@@ -51,10 +51,10 @@ importers:
 
   examples:
     dependencies:
-      '@moira/core':
+      '@nemea/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@moira/protocols':
+      '@nemea/protocols':
         specifier: workspace:*
         version: link:../packages/protocols
 
@@ -62,7 +62,7 @@ importers:
 
   packages/protocols:
     dependencies:
-      '@moira/core':
+      '@nemea/core':
         specifier: workspace:*
         version: link:../core
 

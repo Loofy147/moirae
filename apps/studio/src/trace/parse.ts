@@ -2,7 +2,7 @@
 // anything it needs, it derives from here. Errors name the line, because a
 // trace usually arrives from someone else's machine.
 
-import type { TraceEvent, TraceHeader } from '@moira/core';
+import type { TraceEvent, TraceHeader } from '@nemea/core';
 
 export interface ParsedTrace {
   readonly header: TraceHeader;

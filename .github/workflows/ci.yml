@@ -29,4 +29,4 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
-      - run: pnpm --filter @moira/studio build
+      - run: pnpm --filter @nemea/studio build

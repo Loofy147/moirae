@@ -82,17 +82,17 @@ export default tseslint.config(
         {
           paths: [
             {
-              name: '@moira/core',
+              name: '@nemea/core',
               message:
                 'ADR-003: the studio imports only the trace schema type from the engine — use `import type`.',
               allowTypeImports: true,
             },
             {
-              name: '@moira/protocols',
+              name: '@nemea/protocols',
               message: 'ADR-003: the studio is a pure function of the trace; it does not import protocols.',
             },
             {
-              name: '@moira/examples',
+              name: '@nemea/examples',
               message: 'ADR-003: the studio does not run scenarios; it replays trace files.',
             },
           ],

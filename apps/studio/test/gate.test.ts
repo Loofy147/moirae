@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clean } from '@moira/examples';
+import { clean } from '@nemea/examples';
 import { deriveModel } from '../src/trace/model';
 import { parseJsonl } from '../src/trace/parse';
 
