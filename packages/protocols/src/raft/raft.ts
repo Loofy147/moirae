@@ -393,7 +393,6 @@ export class Raft implements Process<RaftState> {
   // server and per election, so that split votes are rare and resolve quickly.
   // Replacing the timer of the same name is the engine's setTimer contract.
   private resetElectionTimer(ctx: Ctx<RaftState>): void {
-    const range = ELECTION_TIMEOUT_MAX - ELECTION_TIMEOUT_MIN + 1;
-    ctx.setTimer(ELECTION_TIMER, ELECTION_TIMEOUT_MIN + Math.floor(ctx.random() * range));
+    ctx.setTimer(ELECTION_TIMER, ctx.randomInt(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX));
   }
 }
