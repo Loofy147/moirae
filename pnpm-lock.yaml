@@ -33,6 +33,9 @@ importers:
       '@moira/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@moira/examples':
+        specifier: workspace:*
+        version: link:../../examples
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18

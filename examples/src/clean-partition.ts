@@ -12,6 +12,17 @@
 //
 // The trace hash is pinned in examples/test/examples.test.ts: any engine or
 // protocol change that alters a single byte of this run fails the build.
+//
+// The seed is chosen so that the leader is on the MAJORITY side when the wall
+// goes up. That is what makes the story visible: nodes 1 and 2 lose their
+// leader, time out, become candidates again and again, and every vote request
+// dies at the wall — they never become leader. (With the leader inside the
+// minority, as a first seed happened to give, the minority simply keeps its
+// stale leader and never even tries; a different, quieter story, which the
+// studio's gate test in apps/studio/test/gate.test.ts would reject.) The
+// minority's repeated elections raise its term, so on healing the majority
+// leader steps down and one more election follows — the disruptive-server
+// behaviour that pre-vote (out of scope) exists to prevent.
 
 import { simulate, type SimulationResult } from '@moira/core';
 import { electionSafety, logMatching, stateMachineSafety, type RaftState } from '@moira/protocols';
@@ -21,7 +32,7 @@ export const name = 'clean-partition';
 
 export function run(): SimulationResult {
   return simulate<RaftState>({
-    seed: 0xca11,
+    seed: 19,
     nodes: 5,
     process: RaftWithLoad,
     until: { simTime: 6000 },
