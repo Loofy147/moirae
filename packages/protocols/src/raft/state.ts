@@ -2,7 +2,7 @@
 // Understandable Consensus Algorithm" (USENIX ATC 2014), Figure 2.
 // Section references throughout packages/protocols/src/raft are to that paper.
 
-import type { NodeId } from '@moirae/core';
+import type { NodeId } from 'moirae-core';
 
 export type Command = string; // opaque to Raft; the state machine here is the applied sequence
 

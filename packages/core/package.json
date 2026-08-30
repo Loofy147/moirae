@@ -1,5 +1,5 @@
 {
-  "name": "@moirae/core",
+  "name": "moirae-core",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -34,7 +34,6 @@
   },
   "sideEffects": false,
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",

@@ -171,6 +171,39 @@ unrestricted. `apps/studio` is unrestricted.
 
 ---
 
+# ADR-008: The libraries publish unscoped, as moirae-core and moirae-protocols
+
+**Status:** Accepted
+**Date:** 2026-08-30
+**Amends:** ADR-007 (the `@moirae/*` scope)
+
+## Context
+
+npm refuses to create an organisation whose name collides with an existing package. The unscoped
+CLI `moirae` was published first; creating the `@moirae` org afterwards was therefore refused — and
+permanently, because a publish cannot be undone. Nothing about the names was wrong. The **order of
+the two steps** — package before org — is what made the scope unavailable.
+
+## Decision
+
+`@moirae/core` becomes `moirae-core` and `@moirae/protocols` becomes `moirae-protocols`. No
+organisation. `publishConfig.access` is dropped from the published packages (unscoped packages are
+public by default); the `publishConfig.exports` override that points the published entry at `dist/`
+stays. The private workspace packages keep their `@moirae/*` names: they are never published, and a
+scope costs nothing off the registry.
+
+Both names were probed against the registry the same way the project name was — an attempted
+publish of a throwaway, stopped by 2FA — and both pass the similarity check.
+
+## Consequences
+
+- Easier: `npm i moirae-core` reads better than a scope did, and there is one fewer thing to own.
+- Harder: a third rename of the library names, again in one commit.
+- The lesson, so nobody repeats it: **if a project wants an unscoped package and a matching scope,
+  create the org first, then publish.** Publishing first closes the door.
+
+---
+
 # ADR-007: The project is named moirae, not nemea
 
 **Status:** Accepted

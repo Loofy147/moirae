@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { fnv1a64String, hex64 } from '@moirae/core';
+import { fnv1a64String, hex64 } from 'moirae-core';
 import * as clean from '../src/clean-partition';
 import * as harsh from '../src/harsh';
 

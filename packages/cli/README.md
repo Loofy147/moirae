@@ -26,5 +26,5 @@ npx moirae replay some-trace.jsonl
 
 opens any trace the engine wrote. A trace replays byte for byte on any machine.
 
-Source, documentation, and the engine as a library (`@moirae/core`, `@moirae/protocols`):
+Source, documentation, and the engine as a library (`moirae-core`, `moirae-protocols`):
 https://github.com/pchrysostomou/moirae. Apache-2.0.

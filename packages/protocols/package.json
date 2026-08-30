@@ -1,5 +1,5 @@
 {
-  "name": "@moirae/protocols",
+  "name": "moirae-protocols",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "prepack": "vite build && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@moirae/core": "workspace:^"
+    "moirae-core": "workspace:^"
   },
   "exports": {
     ".": "./src/index.ts"
@@ -37,7 +37,6 @@
   },
   "sideEffects": false,
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",

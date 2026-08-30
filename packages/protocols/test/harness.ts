@@ -5,7 +5,7 @@
 // is a simulate() scenario, not a harness test. `random` is a test input, not
 // a PRNG.
 
-import type { Ctx, Message, NodeId, Process } from '@moirae/core';
+import type { Ctx, Message, NodeId, Process } from 'moirae-core';
 
 export interface Sent {
   readonly from: NodeId;

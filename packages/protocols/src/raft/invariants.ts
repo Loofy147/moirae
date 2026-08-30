@@ -13,7 +13,7 @@
 // loses a committed entry — only State Machine Safety (or Leader
 // Completeness) catches that class, so a fuzz gate must include one of them.
 
-import type { Invariant, NodeId, WorldView } from '@moirae/core';
+import type { Invariant, NodeId, WorldView } from 'moirae-core';
 import type { RaftState } from './state';
 
 // Figure 3 — "at most one leader can be elected in a given term."

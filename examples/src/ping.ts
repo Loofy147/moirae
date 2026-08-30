@@ -2,7 +2,7 @@
 // typechecked and linted under the same rules as the shipped protocols, and
 // CI asserts that the README's copy is identical to it.
 
-import { simulate, type Ctx, type Process, type SimulationResult } from '@moirae/core';
+import { simulate, type Ctx, type Process, type SimulationResult } from 'moirae-core';
 
 interface State {
   count: number;

@@ -30,18 +30,15 @@
   "engines": {
     "node": ">=20"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepack": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@moirae/core": "workspace:*",
+    "moirae-core": "workspace:*",
     "@moirae/examples": "workspace:*",
-    "@moirae/protocols": "workspace:*",
+    "moirae-protocols": "workspace:*",
     "@moirae/studio": "workspace:*",
     "vite": "^8.2.2"
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fnv1a64String, hex64, simulate } from '@moirae/core';
-import type { Invariant, NetworkConfig, SimulationResult, WorldView } from '@moirae/core';
+import { fnv1a64String, hex64, simulate } from 'moirae-core';
+import type { Invariant, NetworkConfig, SimulationResult, WorldView } from 'moirae-core';
 
 // The partition scenario's pinned trace hash: Raft plus every engine feature,
 // byte-identical across runs, machines and Node versions (SPEC §10.1). A
