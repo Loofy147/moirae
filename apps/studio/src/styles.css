@@ -271,3 +271,37 @@ body {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+.studio-title {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.file-button {
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.file-button input {
+  display: none;
+}
+
+.landing {
+  margin-top: 24px;
+  padding: 28px;
+  border: 2px dashed var(--line);
+  border-radius: 8px;
+  max-width: 720px;
+  font-size: 14px;
+}
+
+.landing code {
+  background: #f0f0ea;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
