@@ -1,6 +1,6 @@
 {
   "name": "moirae",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deterministic simulation testing for distributed systems, with a visual trace replay. `moirae demo` runs a 5-node Raft cluster through a partition and shows you the failure.",
   "license": "Apache-2.0",
   "author": "Prodromos Chrysostomou",
