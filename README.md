@@ -10,8 +10,8 @@ wall. The three on the right side kept theirs. When the wall came down, one elec
 and a node that crashed came back with its log intact.
 
 This is v0: two protocols (Raft and single-decree Paxos), no trace shrinking, no Byzantine
-faults, no membership changes, no pre-vote, nothing hosted. If you arrived expecting Antithesis, this is the small, readable,
-TypeScript end of that idea — not a replacement for it.
+faults, no membership changes, no pre-vote, nothing hosted. If you arrived expecting Antithesis,
+this is the small, readable TypeScript end of that idea — not a replacement for it.
 
 That run is not a recording of luck. It is seed 19, and it replays byte for byte on your machine:
 
