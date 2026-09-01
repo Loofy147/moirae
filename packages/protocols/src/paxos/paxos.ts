@@ -11,6 +11,7 @@
 import type { Ctx, Message, NodeId, Process } from 'moirae-core';
 import type { Accept, Accepted, PaxosMessage, Prepare, Promised } from './messages';
 import {
+  initialState,
   RETRY_TIMEOUT_MAX,
   RETRY_TIMEOUT_MIN,
   RETRY_TIMER,
@@ -24,20 +25,7 @@ export class Paxos implements Process<PaxosState> {
   readonly persistent = ['promised', 'acceptedN', 'acceptedV'] as const;
 
   init(): PaxosState {
-    return {
-      promised: 0,
-      acceptedN: 0,
-      acceptedV: null,
-      round: 0,
-      attemptN: 0,
-      phase: 'idle',
-      wanted: null,
-      promisesFrom: [],
-      highestAccepted: null,
-      accepts: [],
-      learned: null,
-      proposals: [],
-    };
+    return initialState();
   }
 
   onMessage(ctx: Ctx<PaxosState>, from: NodeId, msg: Message): void {

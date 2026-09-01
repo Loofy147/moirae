@@ -51,3 +51,22 @@ export const RETRY_TIMEOUT_MIN = 150;
 export const RETRY_TIMEOUT_MAX = 300;
 
 export const RETRY_TIMER = 'retry';
+
+// The state every node starts from — also what a restarted node returns to
+// before the persisted acceptor fields are overlaid (SPEC §3).
+export function initialState(): PaxosState {
+  return {
+    promised: 0,
+    acceptedN: 0,
+    acceptedV: null,
+    round: 0,
+    attemptN: 0,
+    phase: 'idle',
+    wanted: null,
+    promisesFrom: [],
+    highestAccepted: null,
+    accepts: [],
+    learned: null,
+    proposals: [],
+  };
+}

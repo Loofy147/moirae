@@ -1,7 +1,7 @@
 # moirae-protocols
 
 Protocol implementations for the [moirae](https://github.com/pchrysostomou/moirae) deterministic
-simulator. v0 ships one: Raft.
+simulator. v0 ships two: Raft and single-decree Paxos.
 
 `Raft` is a transcription of Ongaro & Ousterhout, *In Search of an Understandable Consensus
 Algorithm* (USENIX ATC 2014): leader election, log replication, the §5.4 safety restrictions, and
@@ -14,6 +14,14 @@ naive form.
 
 Also here, as engine invariants: the Figure 3 safety properties `electionSafety()`, `logMatching()`
 and `stateMachineSafety()`.
+
+`Paxos` is a transcription of Lamport, *Paxos Made Simple* (2001): single-decree, every node a
+proposer, acceptor and learner, safety under loss, duplication, reordering, partitions and
+acceptor restarts. Every handler cites its section; every choice the paper leaves open is named
+in [docs/PAXOS.md](https://github.com/pchrysostomou/moirae/blob/main/docs/PAXOS.md), and the
+classically mis-implemented rules — accept `>` where the paper means ≥, phase 2 ignoring the
+highest reported value, stale and duplicated promises counted — each have a test first shown to
+fail against the naive form. Its invariants: `agreement()`, `validity()`, `proposalIntegrity()`.
 
 ```ts
 import { simulate } from 'moirae-core';
@@ -36,5 +44,5 @@ const result = simulate({
 The bare `Raft` elects leaders and replicates whatever is proposed; to feed it entries, subclass
 it and call `propose(ctx, command)` from a timer — the repository's `examples` show how.
 
-Out of scope in v0: membership changes, snapshots, client interaction, pre-vote. Read RAFT.md
-before contributing a handler. Apache-2.0.
+Out of scope in v0: membership changes, snapshots, client interaction, pre-vote, Multi-Paxos.
+Read the protocol's notes — RAFT.md or PAXOS.md — before contributing a handler. Apache-2.0.

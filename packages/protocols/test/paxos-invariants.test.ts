@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorldView } from 'moirae-core';
-import { Paxos, agreement, proposalIntegrity, validity } from '../src/index';
+import { agreement, initialState, proposalIntegrity, validity } from '../src/index';
 import type { PaxosState } from '../src/index';
 
 // The three Paxos invariants against hand-built world views: each must
@@ -8,7 +8,7 @@ import type { PaxosState } from '../src/index';
 // All three carry history, so crashed nodes still constrain later checks.
 
 function state(patch: Partial<PaxosState>): PaxosState {
-  return { ...new Paxos().init(), ...patch };
+  return { ...initialState(), ...patch };
 }
 
 function world(states: (PaxosState | null)[]): WorldView<PaxosState> {
