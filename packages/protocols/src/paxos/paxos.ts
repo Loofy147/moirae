@@ -73,6 +73,8 @@ export class Paxos implements Process<PaxosState> {
     s.round += 1;
     s.attemptN = s.round * this.cluster(ctx) + ctx.me;
     s.phase = 'prepare';
+    s.role = 'proposing'; // C9 — display only
+    s.term = s.attemptN;
     s.promisesFrom = [];
     s.highestAccepted = null;
     // C1 — our own acceptor answers through the same rule as everyone
@@ -202,6 +204,7 @@ export class Paxos implements Process<PaxosState> {
     tally.by.push(acceptor);
     if (tally.by.length * 2 > this.cluster(ctx) && s.learned === null) {
       s.learned = v; // set once; agreement() watches that it never changes
+      s.role = 'learned'; // C9 — display only
       ctx.log('learned', { n, value: v });
       ctx.cancelTimer(RETRY_TIMER); // our value is in, or lost fairly — done
     }
