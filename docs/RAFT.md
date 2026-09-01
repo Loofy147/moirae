@@ -4,6 +4,31 @@ Source of truth: Ongaro & Ousterhout, *In Search of an Understandable Consensus 
 (USENIX ATC 2014), and Ongaro's PhD thesis, *Consensus: Bridging Theory and Practice* (2014).
 Section numbers below refer to the ATC paper.
 
+## ATC paper section index
+
+This index was checked against the [PDF published for USENIX ATC 2014](https://www.usenix.org/system/files/conference/atc14/atc14-paper-ongaro.pdf),
+not the differently numbered extended paper. `SPEC §3` and `SPEC §7` in the code refer to
+[`SPEC.md`](SPEC.md), not to sections of the Raft paper. Citation mismatches found during the audit
+are recorded here; the handler comments themselves are intentionally unchanged.
+
+| Paper section | Title in the ATC paper | Implementation or status |
+|---|---|---|
+| §5 | The Raft consensus algorithm | [`raft.ts`](../packages/protocols/src/raft/raft.ts) implements the server rules; [`invariants.ts`](../packages/protocols/src/raft/invariants.ts) checks three of Figure 3's safety properties. |
+| §5.1 | Raft basics | `Raft.onMessage` applies the term rule before dispatch, and `Raft.becomeFollower` performs the role transition. |
+| §5.2 | Leader election | `Raft.init`, `onTimer`, the vote handlers, and the election, leader, heartbeat, and election-timer helpers in [`raft.ts`](../packages/protocols/src/raft/raft.ts). |
+| §5.3 | Log replication | `Raft.propose`, both AppendEntries handlers, and the replication, commit, and apply helpers in [`raft.ts`](../packages/protocols/src/raft/raft.ts). |
+| §5.4 | Safety | The RequestVote last-log fields are in [`messages.ts`](../packages/protocols/src/raft/messages.ts); §5.4.1 and §5.4.2 below enforce the two safety restrictions. |
+| §5.4.1 | Election restriction | `Raft.onRequestVote` compares the candidates' last log terms, then indices. |
+| §5.4.2 | Committing entries from previous terms | `Raft.advanceCommitIndex` counts replicas only for an entry from the leader's current term. |
+| §5.4.3 | Safety argument | No handler implements a proof. [`invariants.ts`](../packages/protocols/src/raft/invariants.ts) checks the safety properties used by the argument, but cites Figure 3 rather than §5.4.3. |
+| §5.5 | Follower and candidate crashes | Implemented but not cited: `Raft.persistent` and `Raft.init` work with the engine's `crashNode`/`restartNode` in [`simulate.ts`](../packages/core/src/simulate.ts); elections and heartbeats resend RPCs, and the request handlers are idempotent. |
+| §5.6 | Timing and availability | Implemented but not cited: timeout constants are in [`state.ts`](../packages/protocols/src/raft/state.ts), and `Raft.resetElectionTimer` plus `Raft.sendHeartbeats` provide randomized elections and periodic heartbeats. |
+| §6 | Cluster membership changes | [Out of scope for v0](#scope-for-v0). |
+| §7 | Clients and log compaction | [Out of scope for v0](#scope-for-v0); the ATC paper omits the details and points to the extended paper. |
+| §8 | Implementation and evaluation | No protocol rule to implement. Existing `§8` references to clients, reads, and leader no-op entries match the extended paper, not ATC §8; this is a finding only. |
+| §8.3 | Performance | The timeout constants in [`state.ts`](../packages/protocols/src/raft/state.ts) match the paper's 150–300 ms recommendation, but that file cites `§9.3`; ATC §5.6 contains the underlying timing requirement. This is a finding only. |
+| §9.3 | — | No such section exists in the ATC paper. The citation in [`state.ts`](../packages/protocols/src/raft/state.ts) matches the extended paper's Performance section and is intentionally unchanged here. |
+
 This file is a checklist, not a substitute for the paper. Read Figure 2 in the original before
 writing a single handler. Everything below is restated in our own words; where our wording and the
 paper disagree, the paper wins.
