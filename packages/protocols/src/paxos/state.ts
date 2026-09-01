@@ -6,6 +6,11 @@ import type { NodeId } from 'moirae-core';
 
 export type Value = string; // opaque to Paxos, as commands are to Raft
 
+// Display-only summary of what the node is doing, for the studio's SPEC §9
+// lane-colour convention (PAXOS.md C9). Not state from the paper; nothing in
+// the protocol reads it.
+export type PaxosRole = 'idle' | 'proposing' | 'learned';
+
 // The proposer's progress through §2.2's two phases for its current attempt.
 // 'accept' also means "done": once phase 2 has started for a number, that
 // number is bound to its value forever (PAXOS.md #5).
@@ -42,6 +47,11 @@ export type PaxosState = {
 
   // Every value this node ever proposed, for the validity invariant.
   proposals: Value[];
+
+  // Display only (SPEC §9 conventions; C9). role colours the studio lane;
+  // term carries the current attempt's ballot number and labels it.
+  role: PaxosRole;
+  term: number;
 };
 
 // C5 — randomized retry breaks proposer duels the way Raft's randomized
@@ -68,5 +78,7 @@ export function initialState(): PaxosState {
     accepts: [],
     learned: null,
     proposals: [],
+    role: 'idle',
+    term: 0,
   };
 }

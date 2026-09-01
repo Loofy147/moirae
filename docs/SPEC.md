@@ -243,8 +243,9 @@ single-file exports; `?t=ms` sets the playhead. In development the server serves
 gives it only generic `state` patches. So two conventions do the work of colouring the picture:
 
 - A top-level state field named `role` (a string) colours the node's lane. Fixed palette:
-  `leader` blue, `candidate` amber, `follower` grey; any other value gets a neutral colour and
-  its raw name. A field named `currentTerm` (or `term`, a number) labels each stretch of a lane.
+  `leader` blue, `candidate` amber, `follower` grey — and, in the same hues, `learned` blue,
+  `proposing` amber, `idle` grey for protocols where nobody leads (Paxos, PAXOS.md C9); any
+  other value gets a neutral colour and its raw name. A field named `currentTerm` (or `term`, a number) labels each stretch of a lane.
 - If a trace has no `role` field, the studio says so in the legend — *"this trace has no
   top-level `role` field, so lanes aren't coloured by state; see SPEC §9"* — rather than showing
   grey lanes and letting the viewer conclude the tool is broken. Likewise for a missing term.

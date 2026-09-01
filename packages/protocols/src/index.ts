@@ -17,7 +17,7 @@ export type {
 export { electionSafety, logMatching, stateMachineSafety } from './raft/invariants';
 
 export { Paxos } from './paxos/paxos';
-export type { BallotTally, PaxosState, Phase, Value } from './paxos/state';
+export type { BallotTally, PaxosRole, PaxosState, Phase, Value } from './paxos/state';
 export { initialState, RETRY_TIMEOUT_MAX, RETRY_TIMEOUT_MIN, RETRY_TIMER } from './paxos/state';
 export type { Accept, Accepted, PaxosMessage, Prepare, Promised } from './paxos/messages';
 export { agreement, proposalIntegrity, validity } from './paxos/invariants';

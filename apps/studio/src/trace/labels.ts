@@ -7,6 +7,10 @@ const MESSAGE_LABELS: Readonly<Record<string, string>> = {
   RequestVoteResponse: 'vote reply',
   AppendEntries: 'leader heartbeat / replication',
   AppendEntriesResponse: 'replication reply',
+  Prepare: 'asking for promises',
+  Promised: 'promise',
+  Accept: 'accept request',
+  Accepted: 'accepted',
 };
 
 export function messageLabel(type: string): string {
@@ -19,6 +23,11 @@ export const ROLE_COLOURS: Readonly<Record<string, string>> = {
   leader: '#2f6fdb',
   candidate: '#e0a100',
   follower: '#c9c9c2',
+  // The same three hues for the settled / active / passive states of a
+  // roleless protocol's display convention (Paxos, PAXOS.md C9).
+  learned: '#2f6fdb',
+  proposing: '#e0a100',
+  idle: '#c9c9c2',
 };
 
 export const NEUTRAL_ROLE_COLOUR = '#b8b8d0';

@@ -34,7 +34,8 @@ fails and restarts" — see C7 for what that means here):
 Proposer and learner state, volatile: the current attempt (`attemptN`, `phase`, `promisesFrom`,
 `highestAccepted`), the value this node wants (`wanted`), everything this node ever proposed
 (`proposals`, for the validity invariant), the per-ballot tally of Accepted messages
-(`accepts`), and `learned`.
+(`accepts`), and `learned`. Two display-only fields, `role` and `term`, exist for the studio
+and are named by convention, not by the paper (C9).
 
 ## The rules, numbered
 
@@ -115,6 +116,10 @@ leaves open. None of it weakens a safety rule.
   (safe: its number is never reused, its accepts stand); a learner that crashes forgets its
   tally and its learned value, and re-learns only from traffic that still flows. Catch-up is
   out of scope.
+- **C9 — display fields.** `role` ('idle' / 'proposing' / 'learned') and `term` (the current
+  attempt's ballot number) exist so the studio's SPEC §9 conventions colour and label Paxos
+  lanes. They are not state from the paper, nothing in the protocol reads them, and the
+  invariants ignore them. Volatile, like the rest of the proposer's state.
 
 ## Invariants
 

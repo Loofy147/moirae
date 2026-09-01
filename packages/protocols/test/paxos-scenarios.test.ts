@@ -9,7 +9,7 @@ import { PaxosContend, PaxosSolo, PaxosStaggered } from './paxos-load';
 // Scenario 3's trace hash is pinned (SPEC §10.1): byte-identical across
 // runs, machines and Node versions; a deliberate change to Paxos or the
 // engine updates it in the same commit.
-const PARTITION_GOLDEN_HASH = '8b396fe30e66913f';
+const PARTITION_GOLDEN_HASH = '5303f12bfaa7ca32';
 
 const LOSSY: NetworkConfig = { latency: [10, 50], dropRate: 0.02 };
 
