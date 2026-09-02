@@ -26,6 +26,20 @@ export { ABD, compareTags } from './abd/abd';
 export { historyFromTrace, isLinearizable } from './abd/history';
 export type { ABDHistoryOperation, ABDRegisterHistory } from './abd/history';
 export { completedWriteReadFreshness, tagMonotonicity } from './abd/invariants';
+export {
+  REFERENCE_INITIAL,
+  referenceCompareTags,
+  referenceInitialState,
+  referenceRead,
+  referenceReplay,
+  referenceWrite,
+} from './abd/reference';
+export type {
+  ReferenceEvent,
+  ReferenceState,
+  ReferenceTag,
+  ReferenceValue,
+} from './abd/reference';
 export type {
   ABDState,
   PendingRead,
