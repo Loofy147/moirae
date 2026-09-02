@@ -21,3 +21,25 @@ export type { BallotTally, PaxosRole, PaxosState, Phase, Value } from './paxos/s
 export { initialState, RETRY_TIMEOUT_MAX, RETRY_TIMEOUT_MIN, RETRY_TIMER } from './paxos/state';
 export type { Accept, Accepted, PaxosMessage, Prepare, Promised } from './paxos/messages';
 export { agreement, proposalIntegrity, validity } from './paxos/invariants';
+
+export { ABD, compareTags } from './abd/abd';
+export { historyFromTrace, isLinearizable } from './abd/history';
+export type { ABDHistoryOperation, ABDRegisterHistory } from './abd/history';
+export { completedWriteReadFreshness, tagMonotonicity } from './abd/invariants';
+export type {
+  ABDState,
+  PendingRead,
+  PendingWrite,
+  RegisterValue,
+  Tag,
+} from './abd/state';
+export { INITIAL_TAG, SINGLE_WRITER_ID, quorumSize } from './abd/state';
+export type {
+  ABDMessage,
+  ReadPhase1Query,
+  ReadPhase1Response,
+  ReadPhase2Ack,
+  ReadPhase2WriteBack,
+  WriteAck,
+  WriteRequest,
+} from './abd/messages';
