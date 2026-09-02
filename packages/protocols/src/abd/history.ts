@@ -1,6 +1,13 @@
 import type { NodeId } from 'moirae-core';
-import { compareTags } from './abd';
 import type { Tag } from './state';
+
+function referenceCompareTags(a: Tag, b: Tag): number {
+  if (a.counter < b.counter) return -1;
+  if (a.counter > b.counter) return 1;
+  if (a.writerId < b.writerId) return -1;
+  if (a.writerId > b.writerId) return 1;
+  return 0;
+}
 
 export type ABDHistoryOperation =
   | {
@@ -59,7 +66,7 @@ export function isLinearizable(history: ABDRegisterHistory): boolean {
     for (const op of ordered) {
       if (op.kind === 'write') current = op.tag;
     }
-    return compareTags(candidate.tag, current) === 0;
+    return referenceCompareTags(candidate.tag, current) === 0;
   }
 
   function search(): boolean {
