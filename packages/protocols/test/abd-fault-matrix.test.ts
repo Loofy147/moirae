@@ -8,7 +8,7 @@ import {
   tagMonotonicity,
 } from '../src/index';
 import type { ABDState } from '../src/index';
-import type { Ctx } from 'moirae-core';
+import type { Ctx, LogEvent } from 'moirae-core';
 
 class ABDWritePartitionHealRead extends ABD {
   override init(ctx: Ctx<ABDState>): ABDState {
@@ -53,9 +53,9 @@ class ABDConcurrentOverlap extends ABD {
   }
 }
 
-function events(result: ReturnType<typeof simulate<ABDState>>, name: string) {
+function events(result: ReturnType<typeof simulate<ABDState>>, name: string): LogEvent[] {
   return result.trace.filter(
-    (event) => event.kind === 'log' && event.event === name,
+    (event): event is LogEvent => event.kind === 'log' && event.event === name,
   );
 }
 
